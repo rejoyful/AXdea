@@ -1,0 +1,38 @@
+-- AXdea 스키마 — Supabase SQL Editor에 붙여넣고 1회 실행
+-- (프로젝트 생성 후: 좌측 SQL Editor → New query → 아래 전체 붙여넣기 → Run)
+
+create table if not exists ideas (
+  id           uuid primary key default gen_random_uuid(),
+  title        text not null,
+  body         text default '',
+  category     text default 'etc',
+  color        text default '#FFD6A5',
+  avatar_style text not null,
+  avatar_seed  text not null,
+  author       text not null,
+  created_at   timestamptz default now()
+);
+
+create table if not exists comments (
+  id         uuid primary key default gen_random_uuid(),
+  idea_id    uuid references ideas(id) on delete cascade,
+  author     text not null,
+  body       text not null,
+  created_at timestamptz default now()
+);
+
+alter table ideas    enable row level security;
+alter table comments enable row level security;
+
+-- 내부 신뢰 기반 파일럿: 익명(anon) 읽기/쓰기 허용
+drop policy if exists "anon read ideas"    on ideas;
+drop policy if exists "anon write ideas"   on ideas;
+drop policy if exists "anon delete ideas"  on ideas;
+drop policy if exists "anon read comments"  on comments;
+drop policy if exists "anon write comments" on comments;
+
+create policy "anon read ideas"    on ideas    for select using (true);
+create policy "anon write ideas"   on ideas    for insert with check (true);
+create policy "anon delete ideas"  on ideas    for delete using (true);
+create policy "anon read comments"  on comments for select using (true);
+create policy "anon write comments" on comments for insert with check (true);

@@ -1,0 +1,11 @@
+{
+  "name": "axdea",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AXdea — 아이디어 놀이터 (물리 캔버스 + Supabase)",
+  "scripts": {
+    "test": "node test/pure.test.mjs",
+    "dev": "python3 -m http.server 8000"
+  }
+}
