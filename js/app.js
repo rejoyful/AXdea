@@ -15,6 +15,7 @@ const state = {
   bodies: new Map(),  // id -> { x,y,vx,vy,r, el, dragging }
   filter: null,       // 카테고리 key or null
   openId: null,       // 열린 카드의 idea id
+  editId: null,       // 수정 중인 idea id (null이면 신규 작성)
   compose: { category: "etc", color: COLORS[0] },
 };
 state.reveal = isRevealer(state.me);
@@ -68,10 +69,29 @@ async function deleteIdea(id) {
   const { error } = await sb.from("ideas").delete().eq("id", id);
   if (error) console.error(error);
 }
+async function updateIdea(id, fields) {
+  if (DEMO) {
+    const it = demoIdeas.find((i) => i.id === id); if (it) Object.assign(it, fields);
+    const s = state.ideas.find((i) => i.id === id); if (s) Object.assign(s, fields);
+    return true;
+  }
+  const { data, error } = await sb.from("ideas").update(fields).eq("id", id).select();
+  if (error || !data || data.length === 0) {
+    console.error("update failed", error);
+    alert("수정 실패: DB에 update 권한 정책이 없습니다.\nSupabase SQL Editor에서 supabase.sql의 update 정책을 실행해 주세요.");
+    return false;
+  }
+  const s = state.ideas.find((i) => i.id === id); if (s) Object.assign(s, fields);
+  return true;
+}
 async function setStatus(id, status) {
   if (DEMO) { const it = demoIdeas.find((i) => i.id === id); if (it) it.status = status; return true; }
-  const { error } = await sb.from("ideas").update({ status }).eq("id", id);
-  if (error) { console.error(error); alert("상태 변경 실패: " + error.message + "\n(Supabase에 status 컬럼/update 정책이 필요합니다. supabase.sql 참고)"); return false; }
+  const { data, error } = await sb.from("ideas").update({ status }).eq("id", id).select();
+  if (error || !data || data.length === 0) {
+    console.error("status update failed", error);
+    alert("상태 변경 실패: DB에 status 컬럼과 update 정책이 필요합니다.\nSupabase SQL Editor에서 supabase.sql의 해당 SQL을 실행해 주세요.");
+    return false;
+  }
   return true;
 }
 
@@ -181,6 +201,18 @@ function applyRejected(id) {
   if (rj) {
     if (!stamp) { stamp = document.createElement("div"); stamp.className = "char-stamp"; stamp.textContent = "반려"; b.el.appendChild(stamp); }
   } else if (stamp) { stamp.remove(); }
+}
+// 수정 후 캐릭터 외형(색상/카테고리) 갱신 (아바타는 유지)
+function updateCharVisual(id) {
+  const b = state.bodies.get(id);
+  const idea = state.ideas.find((i) => i.id === id);
+  if (!b || !idea) return;
+  b.el.style.setProperty("--cat-hue", catOf(idea.category).hue);
+  const ball = b.el.querySelector(".char-ball");
+  if (ball) ball.style.setProperty("--ball", idea.color);
+  const badge = b.el.querySelector(".char-badge");
+  if (badge) badge.textContent = catOf(idea.category).label;
+  applyRejected(id);
 }
 function rerenderAuthors() {
   state.bodies.forEach((b, id) => {
@@ -296,13 +328,15 @@ async function openCard(id) {
   $("#card-body").innerHTML =
     (rj ? `<div class="card-rej-banner">반려됨 · 진행이 어려운 아이디어로 표시되었습니다</div>` : "") +
     `<div class="card-text">${esc(idea.body || "(내용 없음)")}</div>`;
-  $("#card-footer").innerHTML = state.reveal
-    ? `<button class="btn" id="rej-btn">${rj ? "반려 취소" : "반려"}</button><button class="btn danger" id="del-btn">삭제</button>`
-    : "";
-  if (state.reveal) {
-    $("#del-btn").onclick = () => removeIdea(id);
-    $("#rej-btn").onclick = () => toggleReject(id);
-  }
+  const isOwner = !!state.me && idea.author === state.me;
+  let btns = "";
+  if (state.reveal) btns += `<button class="btn" id="rej-btn">${rj ? "반려 취소" : "반려"}</button>`;
+  if (isOwner) btns += `<button class="btn" id="edit-btn">수정</button>`;
+  if (isOwner || state.reveal) btns += `<button class="btn danger" id="del-btn">삭제</button>`;
+  $("#card-footer").innerHTML = btns;
+  if (state.reveal) $("#rej-btn").onclick = () => toggleReject(id);
+  if (isOwner) $("#edit-btn").onclick = () => openEdit(id);
+  if (isOwner || state.reveal) $("#del-btn").onclick = () => removeIdea(id);
   $("#card-modal").hidden = false;
   renderComments(await loadComments(id));
 }
@@ -359,19 +393,46 @@ function renderComposePickers() {
 }
 function openCompose() {
   if (!state.me) { openNameModal(); return; }
+  state.editId = null;
   state.compose = { category: "etc", color: COLORS[Math.floor(Math.random() * COLORS.length)] };
   $("#c-title").value = ""; $("#c-body").value = "";
+  $("#compose-title").textContent = "새 아이디어 띄우기";
+  $("#c-save").textContent = "띄우기 🎈";
   renderComposePickers();
+  $("#compose-modal").hidden = false;
+  setTimeout(() => $("#c-title").focus(), 50);
+}
+function openEdit(id) {
+  const idea = state.ideas.find((i) => i.id === id);
+  if (!idea) return;
+  state.editId = id;
+  state.compose = { category: idea.category, color: idea.color };
+  $("#c-title").value = idea.title;
+  $("#c-body").value = idea.body || "";
+  $("#compose-title").textContent = "아이디어 수정";
+  $("#c-save").textContent = "수정 저장";
+  renderComposePickers();
+  $("#card-modal").hidden = true;
   $("#compose-modal").hidden = false;
   setTimeout(() => $("#c-title").focus(), 50);
 }
 async function saveIdea() {
   const title = $("#c-title").value.trim();
   if (!title) { $("#c-title").focus(); return; }
-  const row = await addIdea({
-    title, body: $("#c-body").value.trim(),
-    category: state.compose.category, color: state.compose.color, author: state.me,
-  });
+  const fields = { title, body: $("#c-body").value.trim(), category: state.compose.category, color: state.compose.color };
+  // 수정 모드
+  if (state.editId) {
+    const id = state.editId;
+    const ok = await updateIdea(id, fields);
+    if (!ok) return;
+    updateCharVisual(id);
+    state.editId = null;
+    $("#compose-modal").hidden = true;
+    if (state.openId === id) openCard(id);
+    return;
+  }
+  // 신규 작성
+  const row = await addIdea({ ...fields, author: state.me });
   if (!row) return;
   state.ideas.push(row);
   makeChar(row);
@@ -417,7 +478,7 @@ $("#list-btn").onclick = openList;
 $("#list-close").onclick = () => { $("#list-modal").hidden = true; };
 $("#fab").onclick = openCompose;
 $("#card-close").onclick = () => { $("#card-modal").hidden = true; state.openId = null; };
-$("#c-cancel").onclick = () => { $("#compose-modal").hidden = true; };
+$("#c-cancel").onclick = () => { state.editId = null; $("#compose-modal").hidden = true; };
 $("#c-save").onclick = saveIdea;
 $("#comment-form").addEventListener("submit", async (e) => {
   e.preventDefault();
