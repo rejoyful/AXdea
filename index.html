@@ -16,6 +16,7 @@
     </div>
     <div class="filters" id="filters"><!-- 카테고리 칩 --></div>
     <div class="actions">
+      <button class="icon-btn" id="list-btn" title="전체 아이디어 목록" aria-label="전체 아이디어 목록">☰</button>
       <span class="me" id="me-chip" title="이름 변경"></span>
       <button class="icon-btn" id="theme-btn" title="테마 전환" aria-label="테마 전환">◐</button>
     </div>
@@ -69,6 +70,15 @@
         <button class="btn" id="c-cancel">취소</button>
         <button class="btn primary" id="c-save">띄우기 🎈</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 전체 아이디어 목록 모달 -->
+  <div class="modal-scrim" id="list-modal" hidden>
+    <div class="modal list-card">
+      <h2>전체 아이디어 <span class="list-count" id="list-count"></span></h2>
+      <div class="list-items" id="list-items"></div>
+      <button class="modal-close" id="list-close" aria-label="닫기">✕</button>
     </div>
   </div>
 

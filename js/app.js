@@ -5,6 +5,7 @@ import { isRevealer, pickAvatar, stepBody, resolveWall, resolveCollision } from 
 const $ = (s) => document.querySelector(s);
 const catOf = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
 const avatarUrl = (style, seed) => `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+const isRejected = (idea) => !!idea && idea.status === "rejected";
 
 // ---------- 상태 ----------
 const state = {
@@ -66,6 +67,12 @@ async function deleteIdea(id) {
   if (DEMO) { demoIdeas = demoIdeas.filter((i) => i.id !== id); return; }
   const { error } = await sb.from("ideas").delete().eq("id", id);
   if (error) console.error(error);
+}
+async function setStatus(id, status) {
+  if (DEMO) { const it = demoIdeas.find((i) => i.id === id); if (it) it.status = status; return true; }
+  const { error } = await sb.from("ideas").update({ status }).eq("id", id);
+  if (error) { console.error(error); alert("상태 변경 실패: " + error.message + "\n(Supabase에 status 컬럼/update 정책이 필요합니다. supabase.sql 참고)"); return false; }
+  return true;
 }
 
 function seedDemo() {
@@ -161,7 +168,19 @@ function makeChar(idea) {
     r, el, dragging: false,
   };
   state.bodies.set(idea.id, body);
+  applyRejected(idea.id);
   return body;
+}
+// 반려 상태를 캐릭터 외형에 반영 (흑백 + '반려' 스탬프)
+function applyRejected(id) {
+  const b = state.bodies.get(id);
+  if (!b) return;
+  const rj = isRejected(state.ideas.find((i) => i.id === id));
+  b.el.classList.toggle("rejected", rj);
+  let stamp = b.el.querySelector(".char-stamp");
+  if (rj) {
+    if (!stamp) { stamp = document.createElement("div"); stamp.className = "char-stamp"; stamp.textContent = "반려"; b.el.appendChild(stamp); }
+  } else if (stamp) { stamp.remove(); }
 }
 function rerenderAuthors() {
   state.bodies.forEach((b, id) => {
@@ -273,9 +292,17 @@ async function openCard(id) {
         ${state.reveal ? `<span class="card-author-tag">✎ ${esc(idea.author)}</span>` : ""}
       </div>
     </div>`;
-  $("#card-body").textContent = idea.body || "(내용 없음)";
-  $("#card-footer").innerHTML = state.reveal ? `<button class="btn danger" id="del-btn">삭제</button>` : "";
-  if (state.reveal) $("#del-btn").onclick = () => removeIdea(id);
+  const rj = isRejected(idea);
+  $("#card-body").innerHTML =
+    (rj ? `<div class="card-rej-banner">반려됨 · 진행이 어려운 아이디어로 표시되었습니다</div>` : "") +
+    `<div class="card-text">${esc(idea.body || "(내용 없음)")}</div>`;
+  $("#card-footer").innerHTML = state.reveal
+    ? `<button class="btn" id="rej-btn">${rj ? "반려 취소" : "반려"}</button><button class="btn danger" id="del-btn">삭제</button>`
+    : "";
+  if (state.reveal) {
+    $("#del-btn").onclick = () => removeIdea(id);
+    $("#rej-btn").onclick = () => toggleReject(id);
+  }
   $("#card-modal").hidden = false;
   renderComments(await loadComments(id));
 }
@@ -285,6 +312,16 @@ function renderComments(list) {
   box.innerHTML = list.map((c) => `
     <div class="comment">${state.reveal ? `<span class="c-author">${esc(c.author)}</span>` : ""}${esc(c.body)}</div>`).join("");
   box.scrollTop = box.scrollHeight;
+}
+async function toggleReject(id) {
+  const idea = state.ideas.find((i) => i.id === id);
+  if (!idea) return;
+  const next = isRejected(idea) ? "open" : "rejected";
+  const ok = await setStatus(id, next);
+  if (!ok) return;
+  idea.status = next;
+  applyRejected(id);
+  openCard(id); // 카드 UI 갱신(배너/버튼)
 }
 async function removeIdea(id) {
   if (!confirm("이 아이디어를 삭제할까요?")) return;
@@ -344,6 +381,30 @@ async function saveIdea() {
   $("#compose-modal").hidden = true;
 }
 
+// ---------- 전체 아이디어 목록 ----------
+function openList() {
+  const box = $("#list-items");
+  const items = [...state.ideas].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  $("#list-count").textContent = `(${items.length})`;
+  box.innerHTML = items.length
+    ? items.map((i) => {
+        const cat = catOf(i.category);
+        const rj = isRejected(i);
+        const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
+        return `<button class="list-item${rj ? " rej" : ""}" data-id="${i.id}">
+          <span class="li-dot" style="background:${i.color}"></span>
+          <span class="li-title">${esc(i.title)}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
+          <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
+          ${author}
+        </button>`;
+      }).join("")
+    : `<div class="comment-empty">아직 아이디어가 없어요.</div>`;
+  box.querySelectorAll(".list-item").forEach((el) => {
+    el.onclick = () => { $("#list-modal").hidden = true; openCard(el.dataset.id); };
+  });
+  $("#list-modal").hidden = false;
+}
+
 // ---------- 유틸 ----------
 function esc(s) { return String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
 function updateEmpty() { $("#empty-hint").style.display = state.ideas.length ? "none" : ""; }
@@ -352,6 +413,8 @@ function updateEmpty() { $("#empty-hint").style.display = state.ideas.length ? "
 $("#name-save").onclick = saveName;
 $("#name-input").addEventListener("keydown", (e) => { if (e.key === "Enter") saveName(); });
 $("#me-chip").onclick = openNameModal;
+$("#list-btn").onclick = openList;
+$("#list-close").onclick = () => { $("#list-modal").hidden = true; };
 $("#fab").onclick = openCompose;
 $("#card-close").onclick = () => { $("#card-modal").hidden = true; state.openId = null; };
 $("#c-cancel").onclick = () => { $("#compose-modal").hidden = true; };
@@ -376,9 +439,19 @@ document.querySelectorAll(".modal-scrim").forEach((scrim) => {
 // 현재 캔버스를 최신 아이디어 목록에 맞춰 조정(기존 캐릭터 위치/속도는 유지)
 function reconcile(fresh) {
   const freshIds = new Set(fresh.map((i) => i.id));
-  // 새로 생긴 것 추가
+  // 새로 생긴 것 추가 / 기존 것은 상태 변화(반려) 반영
   for (const idea of fresh) {
-    if (!state.bodies.has(idea.id)) { state.ideas.push(idea); makeChar(idea); }
+    if (!state.bodies.has(idea.id)) {
+      state.ideas.push(idea);
+      makeChar(idea);
+    } else {
+      const cur = state.ideas.find((i) => i.id === idea.id);
+      if (cur && cur.status !== idea.status) {
+        cur.status = idea.status;
+        applyRejected(idea.id);
+        if (state.openId === idea.id) openCard(idea.id);
+      }
+    }
   }
   // 삭제된 것 제거
   for (const id of [...state.bodies.keys()]) {

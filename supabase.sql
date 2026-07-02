@@ -21,18 +21,23 @@ create table if not exists comments (
   created_at timestamptz default now()
 );
 
+-- 반려 상태 (open | rejected)
+alter table ideas add column if not exists status text default 'open';
+
 alter table ideas    enable row level security;
 alter table comments enable row level security;
 
 -- 내부 신뢰 기반 파일럿: 익명(anon) 읽기/쓰기 허용
 drop policy if exists "anon read ideas"    on ideas;
 drop policy if exists "anon write ideas"   on ideas;
+drop policy if exists "anon update ideas"  on ideas;
 drop policy if exists "anon delete ideas"  on ideas;
 drop policy if exists "anon read comments"  on comments;
 drop policy if exists "anon write comments" on comments;
 
 create policy "anon read ideas"    on ideas    for select using (true);
 create policy "anon write ideas"   on ideas    for insert with check (true);
+create policy "anon update ideas"  on ideas    for update using (true) with check (true);
 create policy "anon delete ideas"  on ideas    for delete using (true);
 create policy "anon read comments"  on comments for select using (true);
 create policy "anon write comments" on comments for insert with check (true);
