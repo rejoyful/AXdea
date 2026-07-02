@@ -193,6 +193,8 @@ function saveName() {
   $("#name-modal").hidden = true;
   renderMe();
   rerenderAuthors();
+  rerenderMine();
+  refreshCounts();
 }
 
 // ---------- 캔버스 & 물리 ----------
@@ -223,6 +225,7 @@ function makeChar(idea) {
   state.bodies.set(idea.id, body);
   applyRejected(idea.id);
   updateCharCounts(idea.id);
+  applyMine(idea.id);
   return body;
 }
 // 반려 상태를 캐릭터 외형에 반영 (흑백 + '반려' 스탬프)
@@ -288,6 +291,19 @@ async function toggleLike(id) {
   updateCharCounts(id);
   renderSocial(id);
 }
+// 내가 쓴 아이디어를 외관으로 표시 (강조 링 + '내 글' 태그) — 내 화면에만 보임
+function applyMine(id) {
+  const b = state.bodies.get(id);
+  const idea = state.ideas.find((i) => i.id === id);
+  if (!b || !idea) return;
+  const mine = !!state.me && idea.author === state.me;
+  b.el.classList.toggle("mine", mine);
+  let tag = b.el.querySelector(".char-mine");
+  if (mine) {
+    if (!tag) { tag = document.createElement("div"); tag.className = "char-mine"; tag.textContent = "내 글"; b.el.appendChild(tag); }
+  } else if (tag) { tag.remove(); }
+}
+function rerenderMine() { state.bodies.forEach((_, id) => applyMine(id)); }
 function rerenderAuthors() {
   state.bodies.forEach((b, id) => {
     const idea = state.ideas.find((i) => i.id === id);
@@ -581,9 +597,10 @@ function openList() {
         const rj = isRejected(i);
         const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
         const l = state.likeCounts[i.id] || 0, c = state.commentCounts[i.id] || 0;
-        return `<button class="list-item${rj ? " rej" : ""}" data-id="${i.id}">
+        const mine = !!state.me && i.author === state.me;
+        return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}" data-id="${i.id}">
           <span class="li-dot" style="background:${i.color}"></span>
-          <span class="li-title">${esc(i.title)}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
+          <span class="li-title">${esc(i.title)}${mine ? ` <span class="li-mine">내 글</span>` : ""}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
           <span class="li-counts">♥ ${l} · 💬 ${c}</span>
           <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
           ${author}
@@ -691,6 +708,7 @@ async function boot() {
   state.ideas = await loadIdeas();
   state.ideas.forEach(makeChar);
   rerenderAuthors();
+  rerenderMine();
   applyFilter();
   updateEmpty();
   initCat();

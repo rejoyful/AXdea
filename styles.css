@@ -216,6 +216,16 @@ html, body {
 .char-counts .cc-like { color: #e0567a; }
 .char-counts .cc-cmt { color: var(--text-2); }
 
+/* 내가 쓴 글 표시 */
+.char.mine .char-ball { box-shadow: var(--shadow-md), 0 0 0 3px var(--accent); }
+.char-mine {
+  position: absolute; top: -15px; left: -8px;
+  font-size: 10px; font-weight: 800; color: #fff;
+  background: var(--accent); border: 2px solid var(--surface);
+  border-radius: 999px; padding: 1px 6px; white-space: nowrap;
+  box-shadow: var(--shadow-sm); z-index: 2;
+}
+
 /* 아기 고양이 */
 .cat {
   position: absolute; top: 0; left: 0;
@@ -432,6 +442,8 @@ textarea { resize: vertical; line-height: 1.6; }
 }
 .list-item:hover { border-color: var(--border-strong); }
 .list-item.rej { opacity: 0.6; }
+.list-item.mine { border-color: var(--accent); background: var(--accent-weak); }
+.li-mine { font-size: 10.5px; color: #fff; background: var(--accent); border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
 .li-dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(0,0,0,0.08); }
 .li-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .li-title .li-rej { font-size: 10.5px; color: #fff; background: rgba(70,70,80,0.9); border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
