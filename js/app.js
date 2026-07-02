@@ -218,7 +218,7 @@ function makeChar(idea) {
     y: r + Math.random() * Math.max(1, H - 2 * r),
     vx: (Math.random() - 0.5) * 2.4,
     vy: (Math.random() - 0.5) * 2.4,
-    r, el, dragging: false,
+    r, baseR: r, scale: 1, el, dragging: false,
   };
   state.bodies.set(idea.id, body);
   applyRejected(idea.id);
@@ -253,6 +253,9 @@ function updateCharCounts(id) {
   const b = state.bodies.get(id);
   if (!b) return;
   const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
+  // 좋아요가 많을수록 캐릭터가 커진다 (최대 약 2.3배)
+  b.scale = 1 + Math.min(l * 0.07, 1.3);
+  b.r = b.baseR * b.scale;
   let pill = b.el.querySelector(".char-counts");
   if (l === 0 && c === 0) { if (pill) pill.remove(); return; }
   if (!pill) { pill = document.createElement("div"); pill.className = "char-counts"; b.el.appendChild(pill); }
@@ -322,7 +325,7 @@ function loop() {
   }
   for (const id of ids) {
     const b = state.bodies.get(id);
-    b.el.style.transform = `translate(${b.x}px, ${b.y}px)`;
+    b.el.style.transform = `translate(${b.x}px, ${b.y}px) scale(${b.scale})`;
   }
   updateCat(W, H);
   requestAnimationFrame(loop);

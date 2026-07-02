@@ -216,19 +216,35 @@ html, body {
 .char-counts .cc-like { color: #e0567a; }
 .char-counts .cc-cmt { color: var(--text-2); }
 
-/* 고양이 */
+/* 아기 고양이 */
 .cat {
   position: absolute; top: 0; left: 0;
-  width: 56px; height: 56px;
-  margin: -28px 0 0 -28px;
-  font-size: 44px; line-height: 56px; text-align: center;
+  width: 58px; height: 46px;
+  margin: -23px 0 0 -29px;   /* 중심 기준 */
   pointer-events: none;
   z-index: 6;
-  filter: drop-shadow(0 3px 4px rgba(0,0,0,0.25));
   will-change: transform;
 }
-.cat.pounce { animation: pounce 0.28s ease; }
-@keyframes pounce { 0% { font-size: 44px; } 50% { font-size: 58px; } 100% { font-size: 44px; } }
+.cat-inner { width: 100%; height: 100%; animation: catbob 0.42s ease-in-out infinite alternate; }
+.cat-svg { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 3px 3px rgba(0,0,0,0.22)); }
+@keyframes catbob { from { transform: translateY(1px); } to { transform: translateY(-3px); } }
+
+.cat-tail { transform-box: fill-box; transform-origin: 100% 100%; animation: catwag 0.5s ease-in-out infinite alternate; }
+@keyframes catwag { from { transform: rotate(-10deg); } to { transform: rotate(16deg); } }
+
+.cat-head { transform-box: fill-box; transform-origin: 50% 85%; animation: cathead 1.7s ease-in-out infinite alternate; }
+@keyframes cathead { from { transform: rotate(-3.5deg); } to { transform: rotate(3.5deg); } }
+
+.cat-eyes { transform-box: fill-box; transform-origin: 50% 50%; animation: catblink 3.4s infinite; }
+@keyframes catblink { 0%, 91%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+
+.cat .leg { transform-box: fill-box; transform-origin: 50% 0%; }
+.cat .leg-a { animation: legswing 0.34s ease-in-out infinite alternate; }
+.cat .leg-b { animation: legswing 0.34s ease-in-out infinite alternate-reverse; }
+@keyframes legswing { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+
+.cat.pounce .cat-inner { animation: catpounce 0.32s ease; }
+@keyframes catpounce { 0% { transform: translateY(0) scale(1); } 45% { transform: translateY(-12px) scale(1.12); } 100% { transform: translateY(0) scale(1); } }
 
 /* ===== FAB ===== */
 .fab {
