@@ -36,3 +36,8 @@ create policy "anon write ideas"   on ideas    for insert with check (true);
 create policy "anon delete ideas"  on ideas    for delete using (true);
 create policy "anon read comments"  on comments for select using (true);
 create policy "anon write comments" on comments for insert with check (true);
+
+-- (선택) 진짜 '즉시' 실시간을 원하면 아래 실행 — 안 해도 앱은 4초 폴링으로 반영됨.
+-- 이미 추가돼 있으면 "already member" 에러가 날 수 있는데 무시해도 됩니다.
+alter publication supabase_realtime add table ideas;
+alter publication supabase_realtime add table comments;

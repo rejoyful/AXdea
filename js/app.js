@@ -372,6 +372,46 @@ document.querySelectorAll(".modal-scrim").forEach((scrim) => {
   scrim.addEventListener("pointerdown", (e) => { if (e.target === scrim) scrim.hidden = true; });
 });
 
+// ---------- 실시간 동기화 (Realtime + 폴링 폴백) ----------
+// 현재 캔버스를 최신 아이디어 목록에 맞춰 조정(기존 캐릭터 위치/속도는 유지)
+function reconcile(fresh) {
+  const freshIds = new Set(fresh.map((i) => i.id));
+  // 새로 생긴 것 추가
+  for (const idea of fresh) {
+    if (!state.bodies.has(idea.id)) { state.ideas.push(idea); makeChar(idea); }
+  }
+  // 삭제된 것 제거
+  for (const id of [...state.bodies.keys()]) {
+    if (!freshIds.has(id)) {
+      const b = state.bodies.get(id);
+      if (b) { b.el.remove(); state.bodies.delete(id); }
+      state.ideas = state.ideas.filter((i) => i.id !== id);
+      if (state.openId === id) { $("#card-modal").hidden = true; state.openId = null; }
+    }
+  }
+  if (state.reveal) rerenderAuthors();
+  applyFilter();
+  updateEmpty();
+}
+async function refreshIdeas() { if (!DEMO) reconcile(await loadIdeas()); }
+async function refreshOpenComments() { if (!DEMO && state.openId) renderComments(await loadComments(state.openId)); }
+
+function startSync() {
+  if (DEMO) return;
+  // 1) Supabase Realtime — 퍼블리케이션이 켜져 있으면 즉시 반영
+  try {
+    sb.channel("axdea-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ideas" }, () => refreshIdeas())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "comments" }, (p) => {
+        if (p.new && p.new.idea_id === state.openId) refreshOpenComments();
+      })
+      .subscribe();
+  } catch (e) { console.warn("[AXdea] realtime 미사용, 폴링으로 동작", e); }
+  // 2) 폴링 폴백 — realtime이 꺼져 있어도 새로고침 없이 반영
+  setInterval(refreshIdeas, 4000);
+  setInterval(refreshOpenComments, 4000);
+}
+
 // ---------- 부팅 ----------
 async function boot() {
   initTheme();
@@ -383,6 +423,7 @@ async function boot() {
   applyFilter();
   updateEmpty();
   requestAnimationFrame(loop);
+  startSync();
   if (!state.me) openNameModal();
 }
 boot();
