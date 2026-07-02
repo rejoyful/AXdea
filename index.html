@@ -25,6 +25,7 @@
   <!-- 물리 캔버스 -->
   <main class="stage" id="stage">
     <p class="empty-hint" id="empty-hint">아직 아이디어가 없어요. 오른쪽 아래 <b>+</b> 로 첫 아이디어를 띄워보세요.</p>
+    <div class="cat" id="cat" aria-hidden="true">🐈</div>
   </main>
 
   <!-- 새 아이디어 FAB -->
@@ -46,6 +47,7 @@
     <div class="modal idea-card" id="idea-card">
       <div class="card-head" id="card-head"></div>
       <div class="card-body" id="card-body"></div>
+      <div class="card-social" id="card-social"></div>
       <div class="card-comments" id="card-comments"></div>
       <form class="comment-form" id="comment-form">
         <input type="text" id="comment-input" placeholder="댓글 남기기…" maxlength="300" autocomplete="off" />

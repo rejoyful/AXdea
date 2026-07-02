@@ -17,6 +17,10 @@ const state = {
   openId: null,       // 열린 카드의 idea id
   editId: null,       // 수정 중인 idea id (null이면 신규 작성)
   compose: { category: "etc", color: COLORS[0] },
+  commentCounts: {},  // idea_id -> 댓글 수
+  likeCounts: {},     // idea_id -> 좋아요 수
+  myLikes: new Set(), // 내가 좋아요한 idea_id
+  cat: null,          // 고양이 상태
 };
 state.reveal = isRevealer(state.me);
 
@@ -25,6 +29,7 @@ const sb = (SB_URL && SB_KEY && window.supabase) ? window.supabase.createClient(
 const DEMO = !sb;
 let demoIdeas = [];
 let demoComments = [];
+let demoLikes = [];
 let demoSeq = 0;
 const uid = () => `demo-${Date.now()}-${demoSeq++}`;
 
@@ -56,6 +61,34 @@ async function addIdea(fields) {
   const { data, error } = await sb.from("ideas").insert(row).select().single();
   if (error) { console.error(error); alert("저장 실패: " + error.message); return null; }
   return data;
+}
+// 댓글 수 + 좋아요 수 + 내 좋아요 집계 (한 번에 로드)
+async function loadCounts() {
+  const cc = {}, lc = {}, mine = new Set();
+  if (DEMO) {
+    demoComments.forEach((c) => { cc[c.idea_id] = (cc[c.idea_id] || 0) + 1; });
+    demoLikes.forEach((l) => { lc[l.idea_id] = (lc[l.idea_id] || 0) + 1; if (l.voter === state.me) mine.add(l.idea_id); });
+    return { cc, lc, mine };
+  }
+  const [cRes, lRes] = await Promise.all([
+    sb.from("comments").select("idea_id"),
+    sb.from("likes").select("idea_id,voter"),
+  ]);
+  (cRes.data || []).forEach((c) => { cc[c.idea_id] = (cc[c.idea_id] || 0) + 1; });
+  (lRes.data || []).forEach((l) => { lc[l.idea_id] = (lc[l.idea_id] || 0) + 1; if (l.voter === state.me) mine.add(l.idea_id); });
+  return { cc, lc, mine };
+}
+async function likeIdea(id) {
+  if (DEMO) { if (!demoLikes.some((l) => l.idea_id === id && l.voter === state.me)) demoLikes.push({ idea_id: id, voter: state.me }); return true; }
+  const { error } = await sb.from("likes").insert({ idea_id: id, voter: state.me });
+  if (error && error.code !== "23505") { console.error(error); alert("좋아요 실패: likes 테이블이 필요합니다. supabase.sql 참고\n" + error.message); return false; }
+  return true;
+}
+async function unlikeIdea(id) {
+  if (DEMO) { demoLikes = demoLikes.filter((l) => !(l.idea_id === id && l.voter === state.me)); return true; }
+  const { error } = await sb.from("likes").delete().eq("idea_id", id).eq("voter", state.me);
+  if (error) { console.error(error); alert("좋아요 취소 실패: " + error.message); return false; }
+  return true;
 }
 async function addComment(ideaId, author, body) {
   const row = { idea_id: ideaId, author, body };
@@ -189,6 +222,7 @@ function makeChar(idea) {
   };
   state.bodies.set(idea.id, body);
   applyRejected(idea.id);
+  updateCharCounts(idea.id);
   return body;
 }
 // 반려 상태를 캐릭터 외형에 반영 (흑백 + '반려' 스탬프)
@@ -213,6 +247,43 @@ function updateCharVisual(id) {
   const badge = b.el.querySelector(".char-badge");
   if (badge) badge.textContent = catOf(idea.category).label;
   applyRejected(id);
+}
+// 캐릭터에 좋아요/댓글 수 표시 (0/0이면 숨김)
+function updateCharCounts(id) {
+  const b = state.bodies.get(id);
+  if (!b) return;
+  const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
+  let pill = b.el.querySelector(".char-counts");
+  if (l === 0 && c === 0) { if (pill) pill.remove(); return; }
+  if (!pill) { pill = document.createElement("div"); pill.className = "char-counts"; b.el.appendChild(pill); }
+  pill.innerHTML = `${l ? `<span class="cc-like">♥ ${l}</span>` : ""}${c ? `<span class="cc-cmt">💬 ${c}</span>` : ""}`;
+}
+async function refreshCounts() {
+  const { cc, lc, mine } = await loadCounts();
+  state.commentCounts = cc; state.likeCounts = lc; state.myLikes = mine;
+  state.bodies.forEach((_, id) => updateCharCounts(id));
+  if (state.openId) renderSocial(state.openId);
+}
+// 카드 내 좋아요 버튼 + 댓글 수
+function renderSocial(id) {
+  const box = document.getElementById("card-social");
+  if (!box) return;
+  const liked = state.myLikes.has(id);
+  const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
+  box.innerHTML =
+    `<button class="like-btn${liked ? " on" : ""}" id="like-btn">${liked ? "♥" : "♡"} <b>${l}</b> 좋아요</button>` +
+    `<span class="cmt-count">💬 댓글 ${c}</span>`;
+  document.getElementById("like-btn").onclick = () => toggleLike(id);
+}
+async function toggleLike(id) {
+  if (!state.me) { openNameModal(); return; }
+  const liked = state.myLikes.has(id);
+  const ok = liked ? await unlikeIdea(id) : await likeIdea(id);
+  if (!ok) return;
+  if (liked) { state.myLikes.delete(id); state.likeCounts[id] = Math.max(0, (state.likeCounts[id] || 1) - 1); }
+  else { state.myLikes.add(id); state.likeCounts[id] = (state.likeCounts[id] || 0) + 1; }
+  updateCharCounts(id);
+  renderSocial(id);
 }
 function rerenderAuthors() {
   state.bodies.forEach((b, id) => {
@@ -253,7 +324,60 @@ function loop() {
     const b = state.bodies.get(id);
     b.el.style.transform = `translate(${b.x}px, ${b.y}px)`;
   }
+  updateCat(W, H);
   requestAnimationFrame(loop);
+}
+
+// 하단 고양이: 가장 가까운 공을 쫓아 툭툭 쳐서 논다
+function initCat() {
+  const el = $("#cat");
+  const { W, H } = stageSize();
+  state.cat = { x: W * 0.35, y: H - 46, vx: 1.4, dir: 1, targetId: null, cooldown: 0, el };
+}
+function updateCat(W, H) {
+  const cat = state.cat;
+  if (!cat) return;
+  const baseY = H - 46;
+  cat.cooldown = Math.max(0, cat.cooldown - 1);
+
+  // 타겟(가장 가까운 공, 하단 가중치) 재선정
+  if (!cat.targetId || !state.bodies.has(cat.targetId) || cat.cooldown === 0) {
+    let best = null, bd = Infinity;
+    state.bodies.forEach((b, id) => {
+      if (b.dragging) return;
+      const d = Math.abs(b.x - cat.x) + Math.abs(b.y - baseY) * 0.6;
+      if (d < bd) { bd = d; best = id; }
+    });
+    if (cat.cooldown === 0 || !cat.targetId) cat.targetId = best;
+  }
+  const target = cat.targetId ? state.bodies.get(cat.targetId) : null;
+
+  if (target && !target.dragging) {
+    const dx = target.x - cat.x;
+    cat.vx = Math.max(-3.6, Math.min(3.6, dx * 0.05));
+    if (Math.abs(cat.vx) > 0.25) cat.dir = cat.vx > 0 ? 1 : -1;
+    cat.x += cat.vx;
+    // 하단부에 있는 공까지 살짝 뛰어오름
+    const desiredY = Math.max(H * 0.5, Math.min(baseY, target.y));
+    cat.y += (desiredY - cat.y) * 0.09;
+    // 닿으면 공을 위로 튕겨 올림(공놀이)
+    const dist = Math.hypot(target.x - cat.x, target.y - cat.y);
+    if (dist < target.r + 42 && cat.cooldown === 0) {
+      const away = Math.sign(target.x - cat.x) || (Math.random() < 0.5 ? 1 : -1);
+      target.vx = away * (4 + Math.random() * 4);
+      target.vy = -(7 + Math.random() * 5);
+      cat.cooldown = 55;
+      cat.el.classList.add("pounce");
+      setTimeout(() => cat.el.classList.remove("pounce"), 280);
+      cat.targetId = null;
+    }
+  } else {
+    cat.x += cat.vx;
+    if (cat.x < 44 || cat.x > W - 44) cat.vx *= -1;
+    cat.y += (baseY - cat.y) * 0.09;
+  }
+  cat.x = Math.max(30, Math.min(W - 30, cat.x));
+  cat.el.style.transform = `translate(${cat.x}px, ${cat.y}px) scaleX(${cat.dir})`;
 }
 
 // ---------- 드래그 / 던지기 / 클릭 ----------
@@ -337,6 +461,7 @@ async function openCard(id) {
   if (state.reveal) $("#rej-btn").onclick = () => toggleReject(id);
   if (isOwner) $("#edit-btn").onclick = () => openEdit(id);
   if (isOwner || state.reveal) $("#del-btn").onclick = () => removeIdea(id);
+  renderSocial(id);
   $("#card-modal").hidden = false;
   renderComments(await loadComments(id));
 }
@@ -452,9 +577,11 @@ function openList() {
         const cat = catOf(i.category);
         const rj = isRejected(i);
         const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
+        const l = state.likeCounts[i.id] || 0, c = state.commentCounts[i.id] || 0;
         return `<button class="list-item${rj ? " rej" : ""}" data-id="${i.id}">
           <span class="li-dot" style="background:${i.color}"></span>
           <span class="li-title">${esc(i.title)}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
+          <span class="li-counts">♥ ${l} · 💬 ${c}</span>
           <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
           ${author}
         </button>`;
@@ -487,8 +614,12 @@ $("#comment-form").addEventListener("submit", async (e) => {
   const body = input.value.trim();
   if (!body || !state.openId) return;
   input.value = "";
-  await addComment(state.openId, state.me, body);
-  renderComments(await loadComments(state.openId));
+  const id = state.openId;
+  await addComment(id, state.me, body);
+  state.commentCounts[id] = (state.commentCounts[id] || 0) + 1;
+  updateCharCounts(id);
+  renderSocial(id);
+  renderComments(await loadComments(id));
 });
 // 스크림 클릭으로 닫기
 document.querySelectorAll(".modal-scrim").forEach((scrim) => {
@@ -536,14 +667,17 @@ function startSync() {
   try {
     sb.channel("axdea-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "ideas" }, () => refreshIdeas())
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "comments" }, (p) => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, (p) => {
+        refreshCounts();
         if (p.new && p.new.idea_id === state.openId) refreshOpenComments();
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, () => refreshCounts())
       .subscribe();
   } catch (e) { console.warn("[AXdea] realtime 미사용, 폴링으로 동작", e); }
   // 2) 폴링 폴백 — realtime이 꺼져 있어도 새로고침 없이 반영
   setInterval(refreshIdeas, 4000);
   setInterval(refreshOpenComments, 4000);
+  setInterval(refreshCounts, 4000);
 }
 
 // ---------- 부팅 ----------
@@ -556,7 +690,9 @@ async function boot() {
   rerenderAuthors();
   applyFilter();
   updateEmpty();
+  initCat();
   requestAnimationFrame(loop);
+  await refreshCounts();
   startSync();
   if (!state.me) openNameModal();
 }
