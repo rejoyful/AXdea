@@ -48,8 +48,12 @@ create policy "anon read ideas"    on ideas    for select using (true);
 create policy "anon write ideas"   on ideas    for insert with check (true);
 create policy "anon update ideas"  on ideas    for update using (true) with check (true);
 create policy "anon delete ideas"  on ideas    for delete using (true);
-create policy "anon read comments"  on comments for select using (true);
-create policy "anon write comments" on comments for insert with check (true);
+drop policy if exists "anon update comments" on comments;
+drop policy if exists "anon delete comments" on comments;
+create policy "anon read comments"   on comments for select using (true);
+create policy "anon write comments"  on comments for insert with check (true);
+create policy "anon update comments" on comments for update using (true) with check (true);
+create policy "anon delete comments" on comments for delete using (true);
 
 drop policy if exists "anon read likes"   on likes;
 drop policy if exists "anon write likes"  on likes;

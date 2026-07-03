@@ -97,6 +97,18 @@ async function addComment(ideaId, author, body) {
   if (error) { console.error(error); return null; }
   return data;
 }
+async function updateComment(id, body) {
+  if (DEMO) { const c = demoComments.find((x) => x.id === id); if (c) c.body = body; return true; }
+  const { data, error } = await sb.from("comments").update({ body }).eq("id", id).select();
+  if (error || !data || data.length === 0) { console.error("comment update failed", error); alert("댓글 수정 실패: DB에 comments update 정책이 필요합니다. supabase.sql 참고"); return false; }
+  return true;
+}
+async function deleteComment(id) {
+  if (DEMO) { demoComments = demoComments.filter((x) => x.id !== id); return true; }
+  const { data, error } = await sb.from("comments").delete().eq("id", id).select();
+  if (error || !data || data.length === 0) { console.error("comment delete failed", error); alert("댓글 삭제 실패: DB에 comments delete 정책이 필요합니다. supabase.sql 참고"); return false; }
+  return true;
+}
 async function deleteIdea(id) {
   if (DEMO) { demoIdeas = demoIdeas.filter((i) => i.id !== id); return; }
   const { error } = await sb.from("ideas").delete().eq("id", id);
@@ -486,10 +498,50 @@ async function openCard(id) {
 }
 function renderComments(list) {
   const box = $("#card-comments");
+  state.openComments = list;
   if (!list.length) { box.innerHTML = `<div class="comment-empty">첫 댓글을 남겨보세요.</div>`; return; }
-  box.innerHTML = list.map((c) => `
-    <div class="comment">${state.reveal ? `<span class="c-author">${esc(c.author)}</span>` : ""}${esc(c.body)}</div>`).join("");
+  box.innerHTML = list.map((c) => {
+    const mine = !!state.me && c.author === state.me;
+    const ctrls =
+      (mine ? `<button class="c-act" data-act="edit" data-id="${c.id}">수정</button>` : "") +
+      (mine || state.reveal ? `<button class="c-act" data-act="del" data-id="${c.id}">삭제</button>` : "");
+    return `<div class="comment" data-id="${c.id}">
+      <div class="c-main">${state.reveal ? `<span class="c-author">${esc(c.author)}</span>` : ""}<span class="c-body">${esc(c.body)}</span></div>
+      ${ctrls ? `<div class="c-actions">${ctrls}</div>` : ""}
+    </div>`;
+  }).join("");
+  box.querySelectorAll(".c-act").forEach((btn) => {
+    btn.onclick = () => (btn.dataset.act === "edit" ? startEditComment(btn.dataset.id) : removeComment(btn.dataset.id));
+  });
   box.scrollTop = box.scrollHeight;
+}
+function startEditComment(id) {
+  const c = (state.openComments || []).find((x) => x.id === id);
+  const node = document.querySelector(`#card-comments .comment[data-id="${id}"]`);
+  if (!c || !node) return;
+  node.innerHTML = `<div class="c-edit"><input type="text" class="c-edit-input" maxlength="300" value="${esc(c.body)}" /><button class="c-act" data-save="1">저장</button><button class="c-act" data-cancel="1">취소</button></div>`;
+  const input = node.querySelector(".c-edit-input");
+  input.focus();
+  const save = async () => {
+    const v = input.value.trim();
+    if (!v) { input.focus(); return; }
+    const ok = await updateComment(id, v);
+    if (!ok) return;
+    renderComments(await loadComments(state.openId));
+  };
+  node.querySelector("[data-save]").onclick = save;
+  node.querySelector("[data-cancel]").onclick = () => renderComments(state.openComments);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
+}
+async function removeComment(id) {
+  if (!confirm("이 댓글을 삭제할까요?")) return;
+  const ok = await deleteComment(id);
+  if (!ok) return;
+  const oid = state.openId;
+  state.commentCounts[oid] = Math.max(0, (state.commentCounts[oid] || 1) - 1);
+  updateCharCounts(oid);
+  renderSocial(oid);
+  renderComments(await loadComments(oid));
 }
 async function toggleReject(id) {
   const idea = state.ideas.find((i) => i.id === id);
