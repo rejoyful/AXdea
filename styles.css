@@ -159,6 +159,24 @@ html, body {
 .char.pop { animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
 @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
 
+/* 오브제별 랜덤 idle 애니메이션 (공에만 적용 → 물리 이동/크기와 독립) */
+.anim-spin      { animation: aSpin 7s linear infinite; }
+.anim-wobble    { animation: aWobble 2.2s ease-in-out infinite; }
+.anim-pulse     { animation: aPulse 1.9s ease-in-out infinite; }
+.anim-float     { animation: aFloat 2.6s ease-in-out infinite; }
+.anim-jelly     { animation: aJelly 1.7s ease-in-out infinite; }
+.anim-sway      { animation: aSway 2.8s ease-in-out infinite; }
+.anim-heartbeat { animation: aBeat 1.7s ease-in-out infinite; }
+.anim-swing     { animation: aSwing 2.4s ease-in-out infinite; transform-origin: top center; }
+@keyframes aSpin   { to { transform: rotate(360deg); } }
+@keyframes aWobble { 0%,100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
+@keyframes aPulse  { 0%,100% { transform: scale(1); } 50% { transform: scale(1.13); } }
+@keyframes aFloat  { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+@keyframes aJelly  { 0%,100% { transform: scale(1,1); } 25% { transform: scale(1.14,0.88); } 50% { transform: scale(0.9,1.12); } 75% { transform: scale(1.06,0.95); } }
+@keyframes aSway   { 0%,100% { transform: skewX(-7deg) rotate(-3deg); } 50% { transform: skewX(7deg) rotate(3deg); } }
+@keyframes aBeat   { 0%,100% { transform: scale(1); } 14% { transform: scale(1.2); } 28% { transform: scale(1); } 42% { transform: scale(1.13); } 56% { transform: scale(1); } }
+@keyframes aSwing  { 0%,100% { transform: rotate(-11deg); } 50% { transform: rotate(11deg); } }
+
 .char-ball {
   position: relative;
   width: 100%; height: 100%;

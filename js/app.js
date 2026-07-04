@@ -222,6 +222,11 @@ function makeChar(idea) {
   el.innerHTML = `
     <div class="char-ball" style="--ball:${idea.color}"><img alt="" src="${avatarUrl(idea.avatar_style, idea.avatar_seed)}" /></div>
     <div class="char-badge">${catOf(idea.category).label}</div>`;
+  // 오브제마다 랜덤 idle 애니메이션 부여 (공에만)
+  const ball = el.querySelector(".char-ball");
+  const ANIMS = ["anim-spin", "anim-wobble", "anim-pulse", "anim-float", "anim-jelly", "anim-sway", "anim-heartbeat", "anim-swing"];
+  ball.classList.add(ANIMS[Math.floor(Math.random() * ANIMS.length)]);
+  ball.style.animationDelay = (-Math.random() * 4).toFixed(2) + "s";
   stage.appendChild(el);
   attachDrag(el, idea.id);
 
