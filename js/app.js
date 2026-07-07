@@ -755,13 +755,20 @@ async function openArchive() {
   box.innerHTML = rounds.map((r) => {
     const active = r.round === state.activeRound;
     const viewing = r.round === state.viewRound;
-    return `<button class="list-item round-item${viewing ? " viewing" : ""}" data-round="${esc(r.round)}">
+    const renameBtn = state.reveal ? `<button class="round-edit" data-rename="${esc(r.round)}" title="이름 변경">✎</button>` : "";
+    return `<div class="list-item round-item${viewing ? " viewing" : ""}" data-round="${esc(r.round)}">
       <span class="round-name">${esc(r.round)}</span>
       <span class="round-badge${active ? " live" : ""}">${active ? "진행 중" : "아카이브"}</span>
       <span class="round-count">아이디어 ${r.count}</span>
-    </button>`;
+      ${renameBtn}
+    </div>`;
   }).join("");
-  box.querySelectorAll(".round-item").forEach((el) => { el.onclick = () => selectRound(el.dataset.round); });
+  box.querySelectorAll(".round-item").forEach((el) => {
+    el.onclick = (e) => { if (e.target.closest(".round-edit")) return; selectRound(el.dataset.round); };
+  });
+  box.querySelectorAll(".round-edit").forEach((btn) => {
+    btn.onclick = (e) => { e.stopPropagation(); renameRound(btn.dataset.rename); };
+  });
   $("#archive-actions").innerHTML = state.reveal
     ? `<button class="btn primary" id="new-round-btn">＋ 새 라운드 시작 (현재 라운드는 아카이브로 보관)</button>`
     : `<p class="fineprint" style="margin:0">새 라운드 시작은 <b>박찬영 부장</b>만 할 수 있어요.</p>`;
@@ -789,6 +796,23 @@ async function startNewRound() {
   $("#archive-modal").hidden = true;
   await reloadBoard();   // 새(빈) 라운드 보드
   openCompose();         // 새 아이디어 등록 화면 열기
+}
+async function renameRound(oldName) {
+  const newName = (prompt(`'${oldName}' 라운드의 새 이름을 입력하세요.`, oldName) || "").trim();
+  if (!newName || newName === oldName) return;
+  const rounds = await loadRounds();
+  if (rounds.some((r) => r.round === newName)) { alert("이미 있는 라운드 이름이에요."); return; }
+  const isActive = oldName === state.activeRound;
+  // 해당 라운드의 아이디어들도 새 이름으로 이동
+  if (DEMO) { demoIdeas.forEach((i) => { if ((i.round || "lab-day") === oldName) i.round = newName; }); }
+  else {
+    const upd = await sb.from("ideas").update({ round: newName }).eq("round", oldName).select();
+    if (upd.error) { console.error(upd.error); alert("이름 변경 실패: " + upd.error.message); return; }
+  }
+  if (isActive) { const ok = await setActiveRoundDB(newName); if (!ok) return; state.activeRound = newName; }
+  if (state.viewRound === oldName) state.viewRound = newName;
+  await reloadBoard();
+  openArchive();
 }
 async function pollActiveRound() {
   if (DEMO || !state.roundsEnabled) return;
