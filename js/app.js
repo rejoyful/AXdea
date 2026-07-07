@@ -21,7 +21,11 @@ const state = {
   likeCounts: {},     // idea_id -> 좋아요 수
   myLikes: new Set(), // 내가 좋아요한 idea_id
   cat: null,          // 고양이 상태
+  roundsEnabled: false, // 아카이브 구조 사용 가능 여부(DB 감지)
+  activeRound: "lab-day", // 현재 진행 중인 라운드
+  viewRound: "lab-day",   // 지금 보고 있는 라운드 (다르면 읽기 전용)
 };
+const readonly = () => state.roundsEnabled && state.viewRound !== state.activeRound;
 state.reveal = isRevealer(state.me);
 
 // ---------- 데이터 레이어 (Supabase + 데모 폴백) ----------
@@ -39,20 +43,51 @@ if (DEMO) {
 }
 
 async function loadIdeas() {
-  if (DEMO) return [...demoIdeas];
-  const { data, error } = await sb.from("ideas").select("*").order("created_at", { ascending: true });
+  if (DEMO) return demoIdeas.filter((i) => !state.roundsEnabled || (i.round || "lab-day") === state.viewRound);
+  let q = sb.from("ideas").select("*").order("created_at", { ascending: true });
+  if (state.roundsEnabled) q = q.eq("round", state.viewRound);
+  const { data, error } = await q;
   if (error) { console.error(error); return []; }
   return data || [];
 }
-async function loadComments(ideaId) {
-  if (DEMO) return demoComments.filter((c) => c.idea_id === ideaId);
-  const { data, error } = await sb.from("comments").select("*").eq("idea_id", ideaId).order("created_at", { ascending: true });
-  if (error) { console.error(error); return []; }
-  return data || [];
+// 아카이브 구조(라운드 컬럼 + app_state 테이블) 사용 가능 여부 감지
+async function detectRounds() {
+  if (DEMO) return true;
+  const [r1, r2] = await Promise.all([
+    sb.from("ideas").select("round").limit(1),
+    sb.from("app_state").select("key").limit(1),
+  ]);
+  return !r1.error && !r2.error;
+}
+async function loadActiveRound() {
+  if (DEMO) return "lab-day";
+  const { data, error } = await sb.from("app_state").select("value").eq("key", "active_round").maybeSingle();
+  if (error || !data) return "lab-day";
+  return data.value || "lab-day";
+}
+async function setActiveRoundDB(name) {
+  if (DEMO) return true;
+  const { error } = await sb.from("app_state").upsert({ key: "active_round", value: name }).select();
+  if (error) { console.error(error); alert("라운드 전환 실패: " + error.message); return false; }
+  return true;
+}
+// 라운드 목록 + 아이디어 수 (최신 활동 순)
+async function loadRounds() {
+  const counts = {}, last = {};
+  const bump = (r, ts) => { r = r || "lab-day"; counts[r] = (counts[r] || 0) + 1; if (!last[r] || ts > last[r]) last[r] = ts; };
+  if (DEMO) { demoIdeas.forEach((i) => bump(i.round, i.created_at)); }
+  else {
+    const { data } = await sb.from("ideas").select("round,created_at");
+    (data || []).forEach((i) => bump(i.round, i.created_at));
+  }
+  if (!counts[state.activeRound]) { counts[state.activeRound] = 0; last[state.activeRound] = last[state.activeRound] || ""; }
+  return Object.keys(counts).map((r) => ({ round: r, count: counts[r], last: last[r] || "" }))
+    .sort((a, b) => (b.last || "").localeCompare(a.last || ""));
 }
 async function addIdea(fields) {
   const av = pickAvatar(`${fields.author}-${Date.now()}-${Math.random()}`);
   const row = { ...fields, avatar_style: av.style, avatar_seed: av.seed };
+  if (state.roundsEnabled) row.round = state.activeRound;
   if (DEMO) {
     const full = { id: uid(), created_at: new Date().toISOString(), ...row };
     demoIdeas.push(full);
@@ -61,6 +96,12 @@ async function addIdea(fields) {
   const { data, error } = await sb.from("ideas").insert(row).select().single();
   if (error) { console.error(error); alert("저장 실패: " + error.message); return null; }
   return data;
+}
+async function loadComments(ideaId) {
+  if (DEMO) return demoComments.filter((c) => c.idea_id === ideaId);
+  const { data, error } = await sb.from("comments").select("*").eq("idea_id", ideaId).order("created_at", { ascending: true });
+  if (error) { console.error(error); return []; }
+  return data || [];
 }
 // 댓글 수 + 좋아요 수 + 내 좋아요 집계 (한 번에 로드)
 async function loadCounts() {
@@ -293,6 +334,10 @@ function renderSocial(id) {
   if (!box) return;
   const liked = state.myLikes.has(id);
   const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
+  if (readonly()) {
+    box.innerHTML = `<span class="like-static">♥ ${l}</span><span class="cmt-count">💬 댓글 ${c}</span>`;
+    return;
+  }
   box.innerHTML =
     `<button class="like-btn${liked ? " on" : ""}" id="like-btn">${liked ? "♥" : "♡"} <b>${l}</b> 좋아요</button>` +
     `<span class="cmt-count">💬 댓글 ${c}</span>`;
@@ -490,13 +535,18 @@ async function openCard(id) {
     `<div class="card-text">${esc(idea.body || "(내용 없음)")}</div>`;
   const isOwner = !!state.me && idea.author === state.me;
   let btns = "";
-  if (state.reveal) btns += `<button class="btn" id="rej-btn">${rj ? "반려 취소" : "반려"}</button>`;
-  if (isOwner) btns += `<button class="btn" id="edit-btn">수정</button>`;
-  if (isOwner || state.reveal) btns += `<button class="btn danger" id="del-btn">삭제</button>`;
+  if (!readonly()) {
+    if (state.reveal) btns += `<button class="btn" id="rej-btn">${rj ? "반려 취소" : "반려"}</button>`;
+    if (isOwner) btns += `<button class="btn" id="edit-btn">수정</button>`;
+    if (isOwner || state.reveal) btns += `<button class="btn danger" id="del-btn">삭제</button>`;
+  }
   $("#card-footer").innerHTML = btns;
-  if (state.reveal) $("#rej-btn").onclick = () => toggleReject(id);
-  if (isOwner) $("#edit-btn").onclick = () => openEdit(id);
-  if (isOwner || state.reveal) $("#del-btn").onclick = () => removeIdea(id);
+  if (!readonly()) {
+    if (state.reveal) $("#rej-btn").onclick = () => toggleReject(id);
+    if (isOwner) $("#edit-btn").onclick = () => openEdit(id);
+    if (isOwner || state.reveal) $("#del-btn").onclick = () => removeIdea(id);
+  }
+  $("#comment-form").style.display = readonly() ? "none" : "";
   renderSocial(id);
   $("#card-modal").hidden = false;
   renderComments(await loadComments(id));
@@ -506,8 +556,8 @@ function renderComments(list) {
   state.openComments = list;
   if (!list.length) { box.innerHTML = `<div class="comment-empty">첫 댓글을 남겨보세요.</div>`; return; }
   box.innerHTML = list.map((c) => {
-    const mine = !!state.me && c.author === state.me;
-    const ctrls =
+    const mine = !readonly() && !!state.me && c.author === state.me;
+    const ctrls = readonly() ? "" :
       (mine ? `<button class="c-act" data-act="edit" data-id="${c.id}">수정</button>` : "") +
       (mine || state.reveal ? `<button class="c-act" data-act="del" data-id="${c.id}">삭제</button>` : "");
     return `<div class="comment" data-id="${c.id}">
@@ -670,6 +720,87 @@ function openList() {
   $("#list-modal").hidden = false;
 }
 
+// ---------- 라운드 / 아카이브 ----------
+function updateRoundUI() {
+  const chip = $("#round-chip"), archiveBtn = $("#archive-btn"), banner = $("#ro-banner");
+  if (!state.roundsEnabled) { chip.hidden = true; archiveBtn.hidden = true; banner.hidden = true; return; }
+  archiveBtn.hidden = false;
+  chip.hidden = false;
+  const ro = readonly();
+  chip.textContent = (ro ? "🗂 " : "● ") + state.viewRound;
+  chip.classList.toggle("archived", ro);
+  banner.hidden = !ro;
+  if (ro) $("#ro-text").textContent = `아카이브 열람 중: ${state.viewRound} · 읽기 전용`;
+  $("#fab").style.display = ro ? "none" : "";
+}
+async function reloadBoard() {
+  state.bodies.forEach((b) => b.el.remove());
+  state.bodies.clear();
+  state.openId = null;
+  $("#card-modal").hidden = true;
+  state.ideas = await loadIdeas();
+  state.ideas.forEach(makeChar);
+  rerenderAuthors();
+  rerenderMine();
+  applyFilter();
+  updateEmpty();
+  updateRoundUI();
+  await refreshCounts();
+}
+async function openArchive() {
+  if (!state.roundsEnabled) { alert("아카이브 기능을 켜려면 supabase.sql의 라운드 설정을 실행해야 합니다."); return; }
+  const rounds = await loadRounds();
+  $("#archive-count").textContent = `(${rounds.length})`;
+  const box = $("#archive-items");
+  box.innerHTML = rounds.map((r) => {
+    const active = r.round === state.activeRound;
+    const viewing = r.round === state.viewRound;
+    return `<button class="list-item round-item${viewing ? " viewing" : ""}" data-round="${esc(r.round)}">
+      <span class="round-name">${esc(r.round)}</span>
+      <span class="round-badge${active ? " live" : ""}">${active ? "진행 중" : "아카이브"}</span>
+      <span class="round-count">아이디어 ${r.count}</span>
+    </button>`;
+  }).join("");
+  box.querySelectorAll(".round-item").forEach((el) => { el.onclick = () => selectRound(el.dataset.round); });
+  $("#archive-actions").innerHTML = state.reveal
+    ? `<button class="btn primary" id="new-round-btn">＋ 새 라운드 시작 (현재 라운드는 아카이브로 보관)</button>`
+    : `<p class="fineprint" style="margin:0">새 라운드 시작은 <b>박찬영 부장</b>만 할 수 있어요.</p>`;
+  if (state.reveal) $("#new-round-btn").onclick = startNewRound;
+  $("#archive-modal").hidden = false;
+}
+async function selectRound(name) {
+  $("#archive-modal").hidden = true;
+  state.viewRound = name;
+  await reloadBoard();
+}
+async function returnToActive() {
+  state.viewRound = state.activeRound;
+  await reloadBoard();
+}
+async function startNewRound() {
+  const suggested = "round-" + new Date().toISOString().slice(0, 10);
+  const name = (prompt(`새 라운드 이름을 입력하세요.\n(현재 '${state.activeRound}' 라운드는 아카이브로 보관됩니다)`, suggested) || "").trim();
+  if (!name) return;
+  if (name === state.activeRound) { alert("현재 라운드와 같은 이름은 쓸 수 없어요."); return; }
+  const ok = await setActiveRoundDB(name);
+  if (!ok) return;
+  state.activeRound = name;
+  state.viewRound = name;
+  $("#archive-modal").hidden = true;
+  await reloadBoard();   // 새(빈) 라운드 보드
+  openCompose();         // 새 아이디어 등록 화면 열기
+}
+async function pollActiveRound() {
+  if (DEMO || !state.roundsEnabled) return;
+  const cur = await loadActiveRound();
+  if (cur !== state.activeRound) {
+    const wasViewingActive = state.viewRound === state.activeRound;
+    state.activeRound = cur;
+    if (wasViewingActive) { state.viewRound = cur; await reloadBoard(); }
+    else updateRoundUI();
+  }
+}
+
 // ---------- 유틸 ----------
 function esc(s) { return String(s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
 function updateEmpty() { $("#empty-hint").style.display = state.ideas.length ? "none" : ""; }
@@ -684,8 +815,13 @@ $("#fab").onclick = openCompose;
 $("#card-close").onclick = () => { $("#card-modal").hidden = true; state.openId = null; };
 $("#c-cancel").onclick = () => { state.editId = null; $("#compose-modal").hidden = true; };
 $("#c-save").onclick = saveIdea;
+$("#archive-btn").onclick = openArchive;
+$("#round-chip").onclick = openArchive;
+$("#archive-close").onclick = () => { $("#archive-modal").hidden = true; };
+$("#ro-return").onclick = returnToActive;
 $("#comment-form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (readonly()) return;
   if (!state.me) { openNameModal(); return; }
   const input = $("#comment-input");
   const body = input.value.trim();
@@ -735,7 +871,7 @@ function reconcile(fresh) {
   applyFilter();
   updateEmpty();
 }
-async function refreshIdeas() { if (!DEMO) reconcile(await loadIdeas()); }
+async function refreshIdeas() { if (!DEMO && !readonly()) reconcile(await loadIdeas()); }
 async function refreshOpenComments() { if (!DEMO && state.openId) renderComments(await loadComments(state.openId)); }
 
 function startSync() {
@@ -755,6 +891,7 @@ function startSync() {
   setInterval(refreshIdeas, 4000);
   setInterval(refreshOpenComments, 4000);
   setInterval(refreshCounts, 4000);
+  setInterval(pollActiveRound, 5000);
 }
 
 // ---------- 부팅 ----------
@@ -762,12 +899,18 @@ async function boot() {
   initTheme();
   renderFilters();
   renderMe();
+  state.roundsEnabled = await detectRounds();
+  if (state.roundsEnabled) {
+    state.activeRound = await loadActiveRound();
+    state.viewRound = state.activeRound;
+  }
   state.ideas = await loadIdeas();
   state.ideas.forEach(makeChar);
   rerenderAuthors();
   rerenderMine();
   applyFilter();
   updateEmpty();
+  updateRoundUI();
   initCat();
   requestAnimationFrame(loop);
   await refreshCounts();

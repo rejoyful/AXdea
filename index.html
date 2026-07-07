@@ -12,15 +12,22 @@
   <header class="topbar">
     <div class="brand">
       <span class="logo">AX<span class="logo-accent">dea</span></span>
-      <span class="tagline">아이디어 놀이터</span>
+      <button class="round-chip" id="round-chip" title="아카이브 열기" hidden></button>
     </div>
     <div class="filters" id="filters"><!-- 카테고리 칩 --></div>
     <div class="actions">
+      <button class="icon-btn" id="archive-btn" title="아카이브" aria-label="아카이브" hidden>🗂</button>
       <button class="icon-btn" id="list-btn" title="전체 아이디어 목록" aria-label="전체 아이디어 목록">☰</button>
       <span class="me" id="me-chip" title="이름 변경"></span>
       <button class="icon-btn" id="theme-btn" title="테마 전환" aria-label="테마 전환">◐</button>
     </div>
   </header>
+
+  <!-- 아카이브(지난 라운드) 열람 중 배너 -->
+  <div class="ro-banner" id="ro-banner" hidden>
+    <span id="ro-text"></span>
+    <button class="btn" id="ro-return">현재 라운드로 돌아가기</button>
+  </div>
 
   <!-- 물리 캔버스 -->
   <main class="stage" id="stage">
@@ -114,6 +121,17 @@
       <h2>전체 아이디어 <span class="list-count" id="list-count"></span></h2>
       <div class="list-items" id="list-items"></div>
       <button class="modal-close" id="list-close" aria-label="닫기">✕</button>
+    </div>
+  </div>
+
+  <!-- 아카이브 모달 -->
+  <div class="modal-scrim" id="archive-modal" hidden>
+    <div class="modal archive-card">
+      <h2>아카이브 <span class="list-count" id="archive-count"></span></h2>
+      <p class="sub">라운드별로 아이디어를 모아 보관합니다. 지난 라운드는 <b>읽기 전용</b>으로 언제든 열람할 수 있어요.</p>
+      <div class="list-items" id="archive-items"></div>
+      <div class="archive-actions" id="archive-actions"></div>
+      <button class="modal-close" id="archive-close" aria-label="닫기">✕</button>
     </div>
   </div>
 

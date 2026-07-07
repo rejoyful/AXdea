@@ -55,6 +55,23 @@ create policy "anon write comments"  on comments for insert with check (true);
 create policy "anon update comments" on comments for update using (true) with check (true);
 create policy "anon delete comments" on comments for delete using (true);
 
+-- ===== 아카이브(라운드) 구조 =====
+alter table ideas add column if not exists round text default 'lab-day';
+update ideas set round = 'lab-day' where round is null;
+
+create table if not exists app_state (
+  key   text primary key,
+  value text
+);
+alter table app_state enable row level security;
+drop policy if exists "anon read app_state"   on app_state;
+drop policy if exists "anon write app_state"  on app_state;
+drop policy if exists "anon update app_state" on app_state;
+create policy "anon read app_state"   on app_state for select using (true);
+create policy "anon write app_state"  on app_state for insert with check (true);
+create policy "anon update app_state" on app_state for update using (true) with check (true);
+insert into app_state(key, value) values ('active_round', 'lab-day') on conflict (key) do nothing;
+
 drop policy if exists "anon read likes"   on likes;
 drop policy if exists "anon write likes"  on likes;
 drop policy if exists "anon delete likes" on likes;
