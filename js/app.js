@@ -209,25 +209,9 @@ function seedDemo() {
 }
 
 // ---------- 헤더/필터/테마 ----------
-function renderFilters() {
-  const box = $("#filters");
-  box.innerHTML = "";
-  CATEGORIES.forEach((c) => {
-    const chip = document.createElement("button");
-    chip.className = "chip" + (state.filter === c.key ? " on" : "");
-    chip.textContent = c.label;
-    chip.style.setProperty("--chip-hue", c.hue);
-    chip.onclick = () => { state.filter = state.filter === c.key ? null : c.key; renderFilters(); applyFilter(); };
-    box.appendChild(chip);
-  });
-}
-function applyFilter() {
-  state.bodies.forEach((b, id) => {
-    const idea = state.ideas.find((i) => i.id === id);
-    const match = !state.filter || (idea && idea.category === state.filter);
-    b.el.classList.toggle("dim", !match);
-  });
-}
+// 카테고리 필터바는 제거됨 — 카테고리는 캐릭터의 네온 '플래그'로만 구분
+function renderFilters() {}
+function applyFilter() {}
 function renderMe() {
   const chip = $("#me-chip");
   chip.textContent = state.me ? (state.reveal ? `${state.me} · 전체열람` : state.me) : "이름 설정";
@@ -472,7 +456,6 @@ function relayout() {
   renderPanels(regions);
   const catEl = $("#cat");
   if (catEl) catEl.style.display = split ? "none" : "";
-  $("#filters").style.visibility = split ? "hidden" : "";
   $("#marquee").hidden = !state.roundsEnabled || split;
   $("#fab").style.display = readonly() ? "none" : "";
   const splitBtn = $("#split-btn");
