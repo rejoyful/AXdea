@@ -131,6 +131,24 @@ html, body {
   overflow: hidden;
   touch-action: none;
 }
+/* 주제별 분할 패널 */
+.panels { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.panel {
+  position: absolute; box-sizing: border-box;
+  border: 1.5px dashed hsl(var(--cat-hue, 262) 45% 58% / 0.5);
+  border-radius: 16px; margin: 5px;
+}
+.panel-head {
+  position: absolute; top: 9px; left: 11px;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12px; font-weight: 800; color: #fff;
+  background: hsl(var(--cat-hue, 262) 55% 50%);
+  border-radius: 999px; padding: 3px 11px; box-shadow: var(--shadow-sm);
+}
+.panel-count { font-weight: 700; opacity: 0.82; }
+.icon-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-weak); }
+.split-cat.on { color: #fff; border-color: transparent; background: hsl(var(--chip-hue, 262) 65% 55%); }
+
 .empty-hint {
   position: absolute;
   top: 50%; left: 50%;

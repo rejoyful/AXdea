@@ -1,6 +1,6 @@
 // ===== AXdea — 앱 로직 =====
 import { SB_URL, SB_KEY, CATEGORIES, COLORS } from "./config.js";
-import { isRevealer, pickAvatar, stepBody, resolveWall, resolveCollision } from "./pure.js";
+import { isRevealer, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "./pure.js";
 
 const $ = (s) => document.querySelector(s);
 const catOf = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
@@ -24,7 +24,14 @@ const state = {
   roundsEnabled: false, // 아카이브 구조 사용 가능 여부(DB 감지)
   activeRound: "lab-day", // 현재 진행 중인 라운드
   viewRound: "lab-day",   // 지금 보고 있는 라운드 (다르면 읽기 전용)
+  splitMode: false,       // 주제별 화면 분할 보기
+  splitCats: [],          // 분할에 쓸 카테고리 키(2~4)
 };
+// 저장된 분할 보기 설정 복원 (클라이언트 전용)
+try {
+  const sv = JSON.parse(localStorage.getItem("axdea_split") || "null");
+  if (sv && Array.isArray(sv.cats)) { state.splitMode = !!sv.mode; state.splitCats = sv.cats.slice(0, 4); }
+} catch (e) { /* ignore */ }
 const readonly = () => state.roundsEnabled && state.viewRound !== state.activeRound;
 state.reveal = isRevealer(state.me);
 
@@ -279,6 +286,7 @@ function makeChar(idea) {
     vx: (Math.random() - 0.5) * 2.4,
     vy: (Math.random() - 0.5) * 2.4,
     r, baseR: r, scale: 1, el, dragging: false,
+    panel: "all", hidden: false, region: { x0: 0, y0: 0, x1: W, y1: H },
   };
   state.bodies.set(idea.id, body);
   applyRejected(idea.id);
@@ -380,33 +388,126 @@ function rerenderAuthors() {
 function loop() {
   const { W, H } = stageSize();
   const ids = [...state.bodies.keys()];
-  // 이동 + 벽
+  // 이동 + (자기 영역의) 벽
   for (const id of ids) {
     const b = state.bodies.get(id);
-    if (b.dragging) continue;
+    if (b.hidden || b.dragging) continue;
     let nb = stepBody(b, 1);
-    nb = resolveWall(nb, W, H, 0.9);
+    nb = resolveWallRegion(nb, b.region, 0.9);
     // 마찰 + 최소 속도(완전 정지 방지)
     nb.vx *= 0.995; nb.vy *= 0.995;
     const sp = Math.hypot(nb.vx, nb.vy);
     if (sp < 0.18) { nb.vx += (Math.random() - 0.5) * 0.4; nb.vy += (Math.random() - 0.5) * 0.4; }
     Object.assign(b, nb);
   }
-  // 충돌 (드래그 중인 것은 위치 고정, 상대만 밀림)
-  for (let i = 0; i < ids.length; i++) {
-    for (let j = i + 1; j < ids.length; j++) {
-      const a = state.bodies.get(ids[i]), c = state.bodies.get(ids[j]);
-      const [na, nc] = resolveCollision(a, c);
-      if (!a.dragging) Object.assign(a, na);
-      if (!c.dragging) Object.assign(c, nc);
+  // 충돌은 같은 패널(영역) 안에서만
+  const groups = {};
+  for (const id of ids) { const b = state.bodies.get(id); if (b.hidden) continue; (groups[b.panel] = groups[b.panel] || []).push(id); }
+  for (const g in groups) {
+    const arr = groups[g];
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        const a = state.bodies.get(arr[i]), c = state.bodies.get(arr[j]);
+        const [na, nc] = resolveCollision(a, c);
+        if (!a.dragging) Object.assign(a, na);
+        if (!c.dragging) Object.assign(c, nc);
+      }
     }
   }
   for (const id of ids) {
     const b = state.bodies.get(id);
+    if (b.hidden) continue;
     b.el.style.transform = `translate(${b.x}px, ${b.y}px) scale(${b.scale})`;
   }
-  updateCat(W, H);
+  if (!effectiveSplit()) updateCat(W, H);
   requestAnimationFrame(loop);
+}
+
+// ---------- 주제별 화면 분할 ----------
+function effectiveSplit() {
+  return state.splitMode && window.innerWidth > 640 && state.splitCats.length >= 2;
+}
+function computeRegions() {
+  if (!effectiveSplit()) return null;
+  const { W, H } = stageSize();
+  return layoutRegions(state.splitCats, W, H);
+}
+function renderPanels(regions) {
+  const box = $("#panels");
+  if (!regions) { box.innerHTML = ""; return; }
+  box.innerHTML = state.splitCats.map((cat) => {
+    const rg = regions[cat], c = catOf(cat);
+    const count = state.ideas.filter((i) => i.category === cat).length;
+    return `<div class="panel" style="left:${rg.x0}px;top:${rg.y0}px;width:${rg.x1 - rg.x0}px;height:${rg.y1 - rg.y0}px;--cat-hue:${c.hue}">
+      <div class="panel-head">${esc(c.label)}<span class="panel-count">${count}</span></div>
+    </div>`;
+  }).join("");
+}
+// 현재 뷰(통합/분할)에 맞게 각 캐릭터의 영역 배정 + 위치 클램프
+function relayout() {
+  const { W, H } = stageSize();
+  const regions = computeRegions();
+  const split = !!regions;
+  state.bodies.forEach((b, id) => {
+    const idea = state.ideas.find((i) => i.id === id);
+    if (split && idea && regions[idea.category]) {
+      b.hidden = false; b.panel = idea.category; b.region = regions[idea.category];
+    } else if (split) {
+      b.hidden = true; // 선택되지 않은 주제는 숨김
+    } else {
+      b.hidden = false; b.panel = "all"; b.region = { x0: 0, y0: 0, x1: W, y1: H };
+    }
+    b.el.style.display = b.hidden ? "none" : "";
+    if (!b.hidden) {
+      b.x = Math.min(Math.max(b.x, b.region.x0 + b.r), b.region.x1 - b.r);
+      b.y = Math.min(Math.max(b.y, b.region.y0 + b.r), b.region.y1 - b.r);
+    }
+  });
+  renderPanels(regions);
+  const catEl = $("#cat");
+  if (catEl) catEl.style.display = split ? "none" : "";
+  $("#filters").style.visibility = split ? "hidden" : "";
+  const splitBtn = $("#split-btn");
+  if (splitBtn) splitBtn.classList.toggle("on", split);
+}
+function saveSplitPref() { localStorage.setItem("axdea_split", JSON.stringify({ mode: state.splitMode, cats: state.splitCats })); }
+function defaultSplitCats() {
+  const counts = {};
+  state.ideas.forEach((i) => { counts[i.category] = (counts[i.category] || 0) + 1; });
+  return CATEGORIES.map((c) => c.key).sort((a, b) => (counts[b] || 0) - (counts[a] || 0)).slice(0, 4);
+}
+function openSplit() {
+  let sel = state.splitCats.length >= 2 ? state.splitCats.slice() : defaultSplitCats();
+  const box = $("#split-cats");
+  const render = () => {
+    box.innerHTML = CATEGORIES.map((c) => {
+      const on = sel.includes(c.key);
+      return `<button type="button" class="chip split-cat${on ? " on" : ""}" data-cat="${c.key}" style="--chip-hue:${c.hue}">${esc(c.label)}</button>`;
+    }).join("");
+    box.querySelectorAll(".split-cat").forEach((el) => {
+      el.onclick = () => {
+        const cat = el.dataset.cat;
+        if (sel.includes(cat)) sel = sel.filter((x) => x !== cat);
+        else { if (sel.length >= 4) { alert("최대 4개까지 선택할 수 있어요."); return; } sel.push(cat); }
+        render();
+      };
+    });
+    $("#split-apply").disabled = sel.length < 2;
+    $("#split-hint").textContent = `${sel.length}/4 선택됨 · 2~4개`;
+  };
+  render();
+  $("#split-off").hidden = !state.splitMode;
+  $("#split-apply").onclick = () => {
+    if (sel.length < 2) return;
+    state.splitMode = true; state.splitCats = sel.slice(0, 4);
+    saveSplitPref(); relayout();
+    $("#split-modal").hidden = true;
+  };
+  $("#split-off").onclick = () => {
+    state.splitMode = false; saveSplitPref(); relayout();
+    $("#split-modal").hidden = true;
+  };
+  $("#split-modal").hidden = false;
 }
 
 // 하단 고양이: 가장 가까운 공을 쫓아 툭툭 쳐서 논다
@@ -478,9 +579,9 @@ function attachDrag(el, id) {
     if (!b.dragging) return;
     const p = pt(e);
     moved += Math.hypot(p.x - lastX, p.y - lastY);
-    const { W, H } = stageSize();
-    b.x = Math.max(b.r, Math.min(W - b.r, p.x));
-    b.y = Math.max(b.r, Math.min(H - b.r, p.y));
+    const rg = b.region;
+    b.x = Math.max(rg.x0 + b.r, Math.min(rg.x1 - b.r, p.x));
+    b.y = Math.max(rg.y0 + b.r, Math.min(rg.y1 - b.r, p.y));
     const dt = Math.max(1, e.timeStamp - lastT);
     b.vx = (p.x - lastX) / dt * 16;
     b.vy = (p.y - lastY) / dt * 16;
@@ -690,6 +791,7 @@ async function saveIdea() {
   if (state.reveal) rerenderAuthors();
   applyFilter();
   updateEmpty();
+  relayout();
   $("#compose-modal").hidden = true;
 }
 
@@ -747,6 +849,7 @@ async function reloadBoard() {
   applyFilter();
   updateEmpty();
   updateRoundUI();
+  relayout();
   await refreshCounts();
 }
 async function openArchive() {
@@ -845,6 +948,10 @@ $("#archive-btn").onclick = openArchive;
 $("#mq-board").onclick = openArchive;
 $("#archive-close").onclick = () => { $("#archive-modal").hidden = true; };
 $("#mq-return").onclick = returnToActive;
+$("#split-btn").onclick = openSplit;
+$("#split-close").onclick = () => { $("#split-modal").hidden = true; };
+let _rz;
+window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(relayout, 150); });
 $("#comment-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (readonly()) return;
@@ -896,6 +1003,7 @@ function reconcile(fresh) {
   if (state.reveal) rerenderAuthors();
   applyFilter();
   updateEmpty();
+  relayout();
 }
 async function refreshIdeas() { if (!DEMO && !readonly()) reconcile(await loadIdeas()); }
 async function refreshOpenComments() { if (!DEMO && state.openId) renderComments(await loadComments(state.openId)); }
@@ -938,6 +1046,7 @@ async function boot() {
   updateEmpty();
   updateRoundUI();
   initCat();
+  relayout();
   requestAnimationFrame(loop);
   await refreshCounts();
   startSync();

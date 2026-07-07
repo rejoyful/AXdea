@@ -16,6 +16,7 @@
     <div class="filters" id="filters"><!-- 카테고리 칩 --></div>
     <div class="actions">
       <button class="icon-btn" id="archive-btn" title="아카이브" aria-label="아카이브" hidden>🗂</button>
+      <button class="icon-btn" id="split-btn" title="주제별 분할 보기" aria-label="주제별 분할 보기">▦</button>
       <button class="icon-btn" id="list-btn" title="전체 아이디어 목록" aria-label="전체 아이디어 목록">☰</button>
       <span class="me" id="me-chip" title="이름 변경"></span>
       <button class="icon-btn" id="theme-btn" title="테마 전환" aria-label="테마 전환">◐</button>
@@ -33,6 +34,7 @@
 
   <!-- 물리 캔버스 -->
   <main class="stage" id="stage">
+    <div class="panels" id="panels"></div>
     <p class="empty-hint" id="empty-hint">아직 아이디어가 없어요. 오른쪽 아래 <b>+</b> 로 첫 아이디어를 띄워보세요.</p>
     <div class="cat" id="cat" aria-hidden="true">
       <div class="cat-inner">
@@ -134,6 +136,21 @@
       <div class="list-items" id="archive-items"></div>
       <div class="archive-actions" id="archive-actions"></div>
       <button class="modal-close" id="archive-close" aria-label="닫기">✕</button>
+    </div>
+  </div>
+
+  <!-- 주제별 분할 보기 모달 -->
+  <div class="modal-scrim" id="split-modal" hidden>
+    <div class="modal split-card">
+      <h2>주제별 분할 보기</h2>
+      <p class="sub">보고 싶은 주제를 <b>2~4개</b> 고르면 화면을 나눠 각 주제의 아이디어만 모아 보여줍니다.<br />(데스크톱·태블릿 전용, 모바일은 통합으로 표시)</p>
+      <div class="chip-picker" id="split-cats"></div>
+      <p class="fineprint" id="split-hint"></p>
+      <div class="compose-actions">
+        <button class="btn" id="split-off" hidden>통합 보기로</button>
+        <button class="btn primary" id="split-apply">분할 적용</button>
+      </div>
+      <button class="modal-close" id="split-close" aria-label="닫기">✕</button>
     </div>
   </div>
 
