@@ -24,15 +24,15 @@ const state = {
   roundsEnabled: false, // 아카이브 구조 사용 가능 여부(DB 감지)
   activeRound: "lab-day", // 현재 진행 중인 라운드
   viewRound: "lab-day",   // 지금 보고 있는 라운드 (다르면 읽기 전용)
-  splitMode: false,       // 주제별 화면 분할 보기
-  splitCats: [],          // 분할에 쓸 카테고리 키(2~4)
+  splitMode: false,       // 라운드(주제) 분할 비교 보기
+  splitRounds: [],        // 나란히 비교할 라운드 이름(2~4)
 };
 // 저장된 분할 보기 설정 복원 (클라이언트 전용)
 try {
   const sv = JSON.parse(localStorage.getItem("axdea_split") || "null");
-  if (sv && Array.isArray(sv.cats)) { state.splitMode = !!sv.mode; state.splitCats = sv.cats.slice(0, 4); }
+  if (sv && Array.isArray(sv.rounds)) { state.splitMode = !!sv.mode; state.splitRounds = sv.rounds.slice(0, 4); }
 } catch (e) { /* ignore */ }
-const readonly = () => state.roundsEnabled && state.viewRound !== state.activeRound;
+const readonly = () => effectiveSplit() || (state.roundsEnabled && state.viewRound !== state.activeRound);
 state.reveal = isRevealer(state.me);
 
 // ---------- 데이터 레이어 (Supabase + 데모 폴백) ----------
@@ -50,9 +50,14 @@ if (DEMO) {
 }
 
 async function loadIdeas() {
-  if (DEMO) return demoIdeas.filter((i) => !state.roundsEnabled || (i.round || "lab-day") === state.viewRound);
+  const split = effectiveSplit();
+  if (DEMO) {
+    if (split) return demoIdeas.filter((i) => state.splitRounds.includes(i.round || "lab-day"));
+    return demoIdeas.filter((i) => !state.roundsEnabled || (i.round || "lab-day") === state.viewRound);
+  }
   let q = sb.from("ideas").select("*").order("created_at", { ascending: true });
-  if (state.roundsEnabled) q = q.eq("round", state.viewRound);
+  if (split) q = q.in("round", state.splitRounds);
+  else if (state.roundsEnabled) q = q.eq("round", state.viewRound);
   const { data, error } = await q;
   if (error) { console.error(error); return []; }
   return data || [];
@@ -423,23 +428,23 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// ---------- 주제별 화면 분할 ----------
+// ---------- 라운드(주제) 분할 비교 ----------
 function effectiveSplit() {
-  return state.splitMode && window.innerWidth > 640 && state.splitCats.length >= 2;
+  return state.splitMode && state.roundsEnabled && window.innerWidth > 640 && state.splitRounds.length >= 2;
 }
 function computeRegions() {
   if (!effectiveSplit()) return null;
   const { W, H } = stageSize();
-  return layoutRegions(state.splitCats, W, H);
+  return layoutRegions(state.splitRounds, W, H);
 }
 function renderPanels(regions) {
   const box = $("#panels");
   if (!regions) { box.innerHTML = ""; return; }
-  box.innerHTML = state.splitCats.map((cat) => {
-    const rg = regions[cat], c = catOf(cat);
-    const count = state.ideas.filter((i) => i.category === cat).length;
-    return `<div class="panel" style="left:${rg.x0}px;top:${rg.y0}px;width:${rg.x1 - rg.x0}px;height:${rg.y1 - rg.y0}px;--cat-hue:${c.hue}">
-      <div class="panel-head">${esc(c.label)}<span class="panel-count">${count}</span></div>
+  box.innerHTML = state.splitRounds.map((rnd) => {
+    const rg = regions[rnd];
+    const count = state.ideas.filter((i) => (i.round || "lab-day") === rnd).length;
+    return `<div class="panel round-panel" style="left:${rg.x0}px;top:${rg.y0}px;width:${rg.x1 - rg.x0}px;height:${rg.y1 - rg.y0}px">
+      <div class="panel-head">${esc(rnd)}<span class="panel-count">${count}</span></div>
     </div>`;
   }).join("");
 }
@@ -450,10 +455,11 @@ function relayout() {
   const split = !!regions;
   state.bodies.forEach((b, id) => {
     const idea = state.ideas.find((i) => i.id === id);
-    if (split && idea && regions[idea.category]) {
-      b.hidden = false; b.panel = idea.category; b.region = regions[idea.category];
+    const rnd = idea ? (idea.round || "lab-day") : null;
+    if (split && rnd && regions[rnd]) {
+      b.hidden = false; b.panel = rnd; b.region = regions[rnd];
     } else if (split) {
-      b.hidden = true; // 선택되지 않은 주제는 숨김
+      b.hidden = true;
     } else {
       b.hidden = false; b.panel = "all"; b.region = { x0: 0, y0: 0, x1: W, y1: H };
     }
@@ -467,44 +473,50 @@ function relayout() {
   const catEl = $("#cat");
   if (catEl) catEl.style.display = split ? "none" : "";
   $("#filters").style.visibility = split ? "hidden" : "";
+  $("#marquee").hidden = !state.roundsEnabled || split;
+  $("#fab").style.display = readonly() ? "none" : "";
   const splitBtn = $("#split-btn");
   if (splitBtn) splitBtn.classList.toggle("on", split);
 }
-function saveSplitPref() { localStorage.setItem("axdea_split", JSON.stringify({ mode: state.splitMode, cats: state.splitCats })); }
-function defaultSplitCats() {
-  const counts = {};
-  state.ideas.forEach((i) => { counts[i.category] = (counts[i.category] || 0) + 1; });
-  return CATEGORIES.map((c) => c.key).sort((a, b) => (counts[b] || 0) - (counts[a] || 0)).slice(0, 4);
-}
-function openSplit() {
-  let sel = state.splitCats.length >= 2 ? state.splitCats.slice() : defaultSplitCats();
+function saveSplitPref() { localStorage.setItem("axdea_split", JSON.stringify({ mode: state.splitMode, rounds: state.splitRounds })); }
+async function openSplit() {
+  if (!state.roundsEnabled) { alert("아카이브(라운드) 기능을 먼저 켜야 분할 비교가 가능합니다."); return; }
   const box = $("#split-cats");
+  const off = $("#split-off");
+  off.hidden = !state.splitMode;
+  off.onclick = async () => { state.splitMode = false; saveSplitPref(); await reloadBoard(); $("#split-modal").hidden = true; };
+  const rounds = await loadRounds();
+  const names = rounds.map((r) => r.round);
+  if (names.length < 2) {
+    box.innerHTML = `<p class="fineprint" style="margin:0">아직 라운드(주제)가 하나뿐이에요. 🗂 아카이브에서 <b>＋새 라운드 시작</b>으로 주제를 더 만들면 여러 주제를 나란히 비교할 수 있어요.</p>`;
+    $("#split-hint").textContent = "";
+    $("#split-apply").disabled = true;
+    $("#split-modal").hidden = false;
+    return;
+  }
+  let sel = state.splitRounds.filter((r) => names.includes(r));
+  if (sel.length < 2) sel = names.slice(0, Math.min(4, names.length));
   const render = () => {
-    box.innerHTML = CATEGORIES.map((c) => {
-      const on = sel.includes(c.key);
-      return `<button type="button" class="chip split-cat${on ? " on" : ""}" data-cat="${c.key}" style="--chip-hue:${c.hue}">${esc(c.label)}</button>`;
+    box.innerHTML = rounds.map((r) => {
+      const on = sel.includes(r.round);
+      return `<button type="button" class="chip split-cat${on ? " on" : ""}" data-round="${esc(r.round)}">${esc(r.round)}<span class="split-cnt">${r.count}</span></button>`;
     }).join("");
     box.querySelectorAll(".split-cat").forEach((el) => {
       el.onclick = () => {
-        const cat = el.dataset.cat;
-        if (sel.includes(cat)) sel = sel.filter((x) => x !== cat);
-        else { if (sel.length >= 4) { alert("최대 4개까지 선택할 수 있어요."); return; } sel.push(cat); }
+        const rn = el.dataset.round;
+        if (sel.includes(rn)) sel = sel.filter((x) => x !== rn);
+        else { if (sel.length >= 4) { alert("최대 4개까지 비교할 수 있어요."); return; } sel.push(rn); }
         render();
       };
     });
     $("#split-apply").disabled = sel.length < 2;
-    $("#split-hint").textContent = `${sel.length}/4 선택됨 · 2~4개`;
+    $("#split-hint").textContent = `${sel.length}/4 · 2~4개 라운드 선택`;
   };
   render();
-  $("#split-off").hidden = !state.splitMode;
-  $("#split-apply").onclick = () => {
+  $("#split-apply").onclick = async () => {
     if (sel.length < 2) return;
-    state.splitMode = true; state.splitCats = sel.slice(0, 4);
-    saveSplitPref(); relayout();
-    $("#split-modal").hidden = true;
-  };
-  $("#split-off").onclick = () => {
-    state.splitMode = false; saveSplitPref(); relayout();
+    state.splitMode = true; state.splitRounds = sel.slice(0, 4);
+    saveSplitPref(); await reloadBoard();
     $("#split-modal").hidden = true;
   };
   $("#split-modal").hidden = false;
@@ -950,8 +962,15 @@ $("#archive-close").onclick = () => { $("#archive-modal").hidden = true; };
 $("#mq-return").onclick = returnToActive;
 $("#split-btn").onclick = openSplit;
 $("#split-close").onclick = () => { $("#split-modal").hidden = true; };
-let _rz;
-window.addEventListener("resize", () => { clearTimeout(_rz); _rz = setTimeout(relayout, 150); });
+let _rz, _lastSplit = false;
+window.addEventListener("resize", () => {
+  clearTimeout(_rz);
+  _rz = setTimeout(async () => {
+    const now = effectiveSplit();
+    if (now !== _lastSplit) { _lastSplit = now; await reloadBoard(); }
+    else relayout();
+  }, 150);
+});
 $("#comment-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (readonly()) return;
