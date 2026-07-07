@@ -257,6 +257,7 @@ function makeChar(idea) {
   el.dataset.id = idea.id;
   el.style.setProperty("--cat-hue", catOf(idea.category).hue);
   el.innerHTML = `
+    <div class="char-halo"><i></i></div>
     <div class="char-ball" style="--ball:${idea.color}"><img alt="" src="${avatarUrl(idea.avatar_style, idea.avatar_seed)}" /></div>
     <div class="char-badge">${catOf(idea.category).label}</div>`;
   // 오브제마다 랜덤 idle 애니메이션 부여 (공에만)
@@ -314,6 +315,10 @@ function updateCharCounts(id) {
   // 좋아요가 많을수록 캐릭터가 커진다 (최대 약 2.3배)
   b.scale = 1 + Math.min(l * 0.07, 1.3);
   b.r = b.baseR * b.scale;
+  // 좋아요가 쌓이면 하얀 원형 광선이 입체적으로 순환 (많을수록 빠르게)
+  const orbiting = l >= 3;
+  b.el.classList.toggle("orbiting", orbiting);
+  if (orbiting) b.el.style.setProperty("--orbit-dur", Math.max(1.1, 2.8 - l * 0.12).toFixed(2) + "s");
   let pill = b.el.querySelector(".char-counts");
   if (l === 0 && c === 0) { if (pill) pill.remove(); return; }
   if (!pill) { pill = document.createElement("div"); pill.className = "char-counts"; b.el.appendChild(pill); }
@@ -331,10 +336,6 @@ function renderSocial(id) {
   if (!box) return;
   const liked = state.myLikes.has(id);
   const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
-  if (readonly()) {
-    box.innerHTML = `<span class="like-static">♥ ${l}</span><span class="cmt-count">💬 댓글 ${c}</span>`;
-    return;
-  }
   box.innerHTML =
     `<button class="like-btn${liked ? " on" : ""}" id="like-btn">${liked ? "♥" : "♡"} <b>${l}</b> 좋아요</button>` +
     `<span class="cmt-count">💬 댓글 ${c}</span>`;
@@ -428,7 +429,7 @@ function renderPanels(regions) {
     const rg = regions[rnd];
     const count = state.ideas.filter((i) => (i.round || "lab-day") === rnd).length;
     return `<div class="panel round-panel" style="left:${rg.x0}px;top:${rg.y0}px;width:${rg.x1 - rg.x0}px;height:${rg.y1 - rg.y0}px">
-      <div class="panel-head">${esc(rnd)}<span class="panel-count">${count}</span></div>
+      <div class="panel-head"><i class="ph-led"></i><span class="ph-name">${esc((rnd || "").toUpperCase())}</span><span class="panel-count">${count}</span></div>
     </div>`;
   }).join("");
 }
@@ -642,7 +643,7 @@ async function openCard(id) {
     if (isOwner) $("#edit-btn").onclick = () => openEdit(id);
     if (isOwner || state.reveal) $("#del-btn").onclick = () => removeIdea(id);
   }
-  $("#comment-form").style.display = readonly() ? "none" : "";
+  $("#comment-form").style.display = "";
   renderSocial(id);
   $("#card-modal").hidden = false;
   renderComments(await loadComments(id));
@@ -652,8 +653,8 @@ function renderComments(list) {
   state.openComments = list;
   if (!list.length) { box.innerHTML = `<div class="comment-empty">첫 댓글을 남겨보세요.</div>`; return; }
   box.innerHTML = list.map((c) => {
-    const mine = !readonly() && !!state.me && c.author === state.me;
-    const ctrls = readonly() ? "" :
+    const mine = !!state.me && c.author === state.me;
+    const ctrls =
       (mine ? `<button class="c-act" data-act="edit" data-id="${c.id}">수정</button>` : "") +
       (mine || state.reveal ? `<button class="c-act" data-act="del" data-id="${c.id}">삭제</button>` : "");
     return `<div class="comment" data-id="${c.id}">
@@ -956,7 +957,6 @@ window.addEventListener("resize", () => {
 });
 $("#comment-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  if (readonly()) return;
   if (!state.me) { openNameModal(); return; }
   const input = $("#comment-input");
   const body = input.value.trim();
