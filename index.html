@@ -12,7 +12,6 @@
   <header class="topbar">
     <div class="brand">
       <span class="logo">AX<span class="logo-accent">dea</span></span>
-      <button class="round-chip" id="round-chip" title="아카이브 열기" hidden></button>
     </div>
     <div class="filters" id="filters"><!-- 카테고리 칩 --></div>
     <div class="actions">
@@ -23,10 +22,13 @@
     </div>
   </header>
 
-  <!-- 아카이브(지난 라운드) 열람 중 배너 -->
-  <div class="ro-banner" id="ro-banner" hidden>
-    <span id="ro-text"></span>
-    <button class="btn" id="ro-return">현재 라운드로 돌아가기</button>
+  <!-- 상단 중앙 LED 전광판 (현재 라운드 타이틀) -->
+  <div class="marquee" id="marquee" hidden>
+    <div class="mq-board" id="mq-board" title="아카이브 열기">
+      <span class="mq-status"><i class="mq-dot"></i><b id="mq-label">LIVE</b></span>
+      <div class="mq-screen"><div class="mq-track" id="mq-track"></div></div>
+    </div>
+    <button class="mq-return" id="mq-return" hidden>← 현재 라운드로</button>
   </div>
 
   <!-- 물리 캔버스 -->

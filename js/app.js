@@ -722,15 +722,17 @@ function openList() {
 
 // ---------- 라운드 / 아카이브 ----------
 function updateRoundUI() {
-  const chip = $("#round-chip"), archiveBtn = $("#archive-btn"), banner = $("#ro-banner");
-  if (!state.roundsEnabled) { chip.hidden = true; archiveBtn.hidden = true; banner.hidden = true; return; }
+  const marquee = $("#marquee"), archiveBtn = $("#archive-btn");
+  if (!state.roundsEnabled) { marquee.hidden = true; archiveBtn.hidden = true; return; }
   archiveBtn.hidden = false;
-  chip.hidden = false;
+  marquee.hidden = false;
   const ro = readonly();
-  chip.textContent = (ro ? "🗂 " : "● ") + state.viewRound;
-  chip.classList.toggle("archived", ro);
-  banner.hidden = !ro;
-  if (ro) $("#ro-text").textContent = `아카이브 열람 중: ${state.viewRound} · 읽기 전용`;
+  const label = esc((state.viewRound || "").toUpperCase());
+  const seg = Array(6).fill(label).join("&nbsp;&nbsp;◆&nbsp;&nbsp;") + "&nbsp;&nbsp;◆&nbsp;&nbsp;";
+  $("#mq-track").innerHTML = `<span>${seg}</span><span>${seg}</span>`;
+  $("#mq-board").classList.toggle("archive", ro);
+  $("#mq-label").textContent = ro ? "ARCHIVE" : "LIVE";
+  $("#mq-return").hidden = !ro;
   $("#fab").style.display = ro ? "none" : "";
 }
 async function reloadBoard() {
@@ -840,9 +842,9 @@ $("#card-close").onclick = () => { $("#card-modal").hidden = true; state.openId 
 $("#c-cancel").onclick = () => { state.editId = null; $("#compose-modal").hidden = true; };
 $("#c-save").onclick = saveIdea;
 $("#archive-btn").onclick = openArchive;
-$("#round-chip").onclick = openArchive;
+$("#mq-board").onclick = openArchive;
 $("#archive-close").onclick = () => { $("#archive-modal").hidden = true; };
-$("#ro-return").onclick = returnToActive;
+$("#mq-return").onclick = returnToActive;
 $("#comment-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (readonly()) return;
