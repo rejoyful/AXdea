@@ -29,7 +29,7 @@ export const api = {
   updateIdea: (id, fields) => req("PATCH", `/ideas/${id}`, fields),
   deleteIdea: (id) => req("DELETE", `/ideas/${id}`),
   comments: (ideaId) => req("GET", `/comments?idea_id=${enc(ideaId)}`),
-  addComment: (idea_id, author, body) => req("POST", "/comments", { idea_id, author, body }),
+  addComment: (idea_id, author, body, extra = {}) => req("POST", "/comments", { idea_id, author, body, ...extra }),
   updateComment: (id, body) => req("PATCH", `/comments/${id}`, { body }),
   deleteComment: (id) => req("DELETE", `/comments/${id}`),
   counts: (me) => req("GET", `/counts${me ? `?me=${enc(me)}` : ""}`),

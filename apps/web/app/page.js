@@ -8,11 +8,15 @@ const MARKUP = `
       <span class="logo">AX<span class="logo-accent">dea</span></span>
     </div>
     <div class="actions">
-      <button class="navbtn" id="archive-btn" title="지난 라운드 아카이브" aria-label="아카이브" hidden><span class="nb-ico">🗂</span><span class="nb-label">아카이브</span></button>
-      <button class="navbtn" id="split-btn" title="라운드 분할 비교" aria-label="분할 비교"><span class="nb-ico">▤</span><span class="nb-label">분할</span></button>
-      <button class="navbtn" id="list-btn" title="전체 아이디어 목록" aria-label="목록"><span class="nb-ico">≣</span><span class="nb-label">목록</span></button>
-      <button class="navbtn" id="theme-btn" title="테마 전환" aria-label="테마"><span class="nb-ico">◐</span><span class="nb-label">테마</span></button>
-      <span class="me" id="me-chip" title="이름 변경"></span>
+      <div class="actions-group">
+        <button class="navbtn" id="archive-btn" title="지난 라운드 아카이브" aria-label="아카이브" hidden><span class="nb-ico"></span><span class="nb-label">아카이브</span></button>
+        <button class="navbtn" id="split-btn" title="라운드 분할 비교" aria-label="분할 비교"><span class="nb-ico"></span><span class="nb-label">분할</span></button>
+        <button class="navbtn" id="list-btn" title="전체 아이디어 목록" aria-label="목록"><span class="nb-ico"></span><span class="nb-label">목록</span></button>
+      </div>
+      <div class="actions-side">
+        <button class="navbtn" id="theme-btn" title="테마 전환" aria-label="테마"><span class="nb-ico"></span><span class="nb-label">테마</span></button>
+        <span class="me" id="me-chip" title="이름 변경"></span>
+      </div>
     </div>
   </header>
 
@@ -29,33 +33,39 @@ const MARKUP = `
     <p class="empty-hint" id="empty-hint">아직 아이디어가 없어요. 오른쪽 아래 <b>+</b> 로 첫 아이디어를 띄워보세요.</p>
     <div class="cat" id="cat" aria-hidden="true">
       <div class="cat-inner">
-        <svg class="cat-svg" viewBox="0 0 72 56" xmlns="http://www.w3.org/2000/svg">
-          <path class="cat-tail" d="M14 42 C3 42 2 26 9 21" fill="none" stroke="#f2a65a" stroke-width="6" stroke-linecap="round"/>
-          <rect class="leg leg-b" x="22" y="42" width="6" height="11" rx="3" fill="#e8934a"/>
-          <rect class="leg leg-a" x="40" y="42" width="6" height="11" rx="3" fill="#e8934a"/>
-          <ellipse cx="34" cy="38" rx="20" ry="13" fill="#f2a65a"/>
-          <rect class="leg leg-a" x="27" y="44" width="6" height="10" rx="3" fill="#f2a65a"/>
-          <rect class="leg leg-b" x="44" y="44" width="6" height="10" rx="3" fill="#f2a65a"/>
+        <svg class="cat-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <!-- 꼬리 (살랑살랑) -->
+          <path class="cat-tail" d="M45 52 C60 50 60 32 51 31" fill="none" stroke="#e8934a" stroke-width="7" stroke-linecap="round"/>
+          <!-- 앉은 몸통 -->
+          <path d="M18 56 C15 40 22 29 32 29 C42 29 49 40 46 56 Z" fill="#f2a65a"/>
+          <path d="M32 34 C26 34 22 42 23 56 L41 56 C42 42 38 34 32 34 Z" fill="#f7b36c"/>
+          <!-- 앞발 -->
+          <ellipse cx="26" cy="54" rx="5" ry="6.5" fill="#f7b36c"/>
+          <ellipse cx="38" cy="54" rx="5" ry="6.5" fill="#f7b36c"/>
+          <path d="M23.5 55 L28.5 55 M33.5 55 L38.5 55" stroke="#e8934a" stroke-width="0.9" stroke-linecap="round"/>
+          <!-- 머리 -->
           <g class="cat-head">
-            <path d="M41 12 L45 2 L53 11 Z" fill="#f2a65a"/>
-            <path d="M65 12 L66 2 L56 9 Z" fill="#f2a65a"/>
-            <path d="M44 11 L46 5 L51 10 Z" fill="#ffc9c9"/>
-            <path d="M63 11 L64 5 L58 9 Z" fill="#ffc9c9"/>
-            <circle cx="52" cy="22" r="14" fill="#f7b36c"/>
-            <circle cx="45" cy="27" r="3" fill="#ffb3b3" opacity="0.6"/>
-            <circle cx="59" cy="27" r="3" fill="#ffb3b3" opacity="0.6"/>
+            <path d="M21 15 L18 3 L31 12 Z" fill="#f2a65a"/>
+            <path d="M43 15 L46 3 L33 12 Z" fill="#f2a65a"/>
+            <path d="M23 13 L22 6 L30 12 Z" fill="#ffc9c9"/>
+            <path d="M41 13 L42 6 L34 12 Z" fill="#ffc9c9"/>
+            <circle cx="32" cy="22" r="15" fill="#f7b36c"/>
+            <circle cx="24.5" cy="26" r="3.2" fill="#ffb3b3" opacity="0.55"/>
+            <circle cx="39.5" cy="26" r="3.2" fill="#ffb3b3" opacity="0.55"/>
             <g class="cat-eyes">
-              <ellipse cx="47" cy="21" rx="2.6" ry="3.6" fill="#2b2b2b"/>
-              <ellipse cx="57" cy="21" rx="2.6" ry="3.6" fill="#2b2b2b"/>
-              <circle cx="48" cy="19.6" r="0.9" fill="#fff"/>
-              <circle cx="58" cy="19.6" r="0.9" fill="#fff"/>
+              <ellipse cx="26.5" cy="21" rx="2.7" ry="3.8" fill="#2b2b2b"/>
+              <ellipse cx="37.5" cy="21" rx="2.7" ry="3.8" fill="#2b2b2b"/>
+              <circle cx="27.6" cy="19.5" r="1" fill="#fff"/>
+              <circle cx="38.6" cy="19.5" r="1" fill="#fff"/>
             </g>
-            <path d="M50.4 26 L53.6 26 L52 28.2 Z" fill="#e26d6d"/>
+            <path d="M30 25 L34 25 L32 27.4 Z" fill="#e26d6d"/>
+            <path d="M32 27.4 C32 29 30.4 29.6 29 29" fill="none" stroke="#d9825a" stroke-width="0.9" stroke-linecap="round"/>
+            <path d="M32 27.4 C32 29 33.6 29.6 35 29" fill="none" stroke="#d9825a" stroke-width="0.9" stroke-linecap="round"/>
             <g stroke="#d9a06b" stroke-width="1" stroke-linecap="round">
-              <line x1="44" y1="27" x2="37" y2="26"/>
-              <line x1="44" y1="29" x2="37" y2="30"/>
-              <line x1="60" y1="27" x2="67" y2="26"/>
-              <line x1="60" y1="29" x2="67" y2="30"/>
+              <line x1="24" y1="25" x2="15" y2="24"/>
+              <line x1="24" y1="27" x2="15" y2="29"/>
+              <line x1="40" y1="25" x2="49" y2="24"/>
+              <line x1="40" y1="27" x2="49" y2="29"/>
             </g>
           </g>
         </svg>
@@ -63,7 +73,7 @@ const MARKUP = `
     </div>
   </main>
 
-  <button class="fab" id="fab" title="아이디어 추가" aria-label="아이디어 추가">+</button>
+  <button class="fab" id="fab" title="아이디어 추가" aria-label="아이디어 추가"></button>
 
   <div class="modal-scrim" id="name-modal" hidden>
     <div class="modal name-card">
@@ -82,8 +92,11 @@ const MARKUP = `
       <div class="card-social" id="card-social"></div>
       <div class="card-comments" id="card-comments"></div>
       <form class="comment-form" id="comment-form">
-        <input type="text" id="comment-input" placeholder="댓글 남기기…" maxlength="300" autocomplete="off"/>
-        <button class="btn" type="submit">등록</button>
+        <div class="sent-pick" id="comment-sent"></div>
+        <div class="comment-row">
+          <textarea id="comment-input" placeholder="댓글 남기기…" maxlength="300" rows="2" autocomplete="off"></textarea>
+          <button class="btn primary" type="submit">등록</button>
+        </div>
       </form>
       <div class="card-footer" id="card-footer"></div>
       <button class="modal-close" id="card-close" aria-label="닫기">✕</button>
@@ -94,7 +107,7 @@ const MARKUP = `
     <div class="modal compose-card">
       <h2 id="compose-title">새 아이디어 띄우기</h2>
       <input type="text" id="c-title" placeholder="한 줄 제목" maxlength="60" autocomplete="off"/>
-      <textarea id="c-body" placeholder="무엇을 해보고 싶나요? 어떤 불편을 풀고 싶나요?" maxlength="1000" rows="4"></textarea>
+      <textarea id="c-body" placeholder="무엇을 해보고 싶나요? 어떤 불편을 풀고 싶나요?" maxlength="1000" rows="6"></textarea>
       <label class="field-label">카테고리</label>
       <div class="chip-picker" id="c-category"></div>
       <label class="field-label">색상</label>
@@ -109,6 +122,7 @@ const MARKUP = `
   <div class="modal-scrim" id="list-modal" hidden>
     <div class="modal list-card">
       <h2>전체 아이디어 <span class="list-count" id="list-count"></span></h2>
+      <div class="list-sort" id="list-sort"></div>
       <div class="list-items" id="list-items"></div>
       <button class="modal-close" id="list-close" aria-label="닫기">✕</button>
     </div>

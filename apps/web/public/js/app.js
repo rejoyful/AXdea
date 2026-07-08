@@ -1,9 +1,11 @@
 // ===== AXdea — 앱 로직 =====
-import { CATEGORIES, COLORS } from "./config.js";
+import { CATEGORIES, COLORS, PANEL_COLORS } from "./config.js";
 import { api } from "./api.js";
+import { icon } from "./icons.js";
 import { isRevealer, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "./pure.js";
 
 const $ = (s) => document.querySelector(s);
+const TOP_INSET = 92; // 전광판 아래로만 아이디어가 돌아다니도록 상단 여백(스테이지 기준)
 const catOf = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
 const avatarUrl = (style, seed) => `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
 const isRejected = (idea) => !!idea && idea.status === "rejected";
@@ -114,9 +116,9 @@ async function unlikeIdea(id) {
   if (DEMO) { demoLikes = demoLikes.filter((l) => !(l.idea_id === id && l.voter === state.me)); return true; }
   try { await api.unlike(id, state.me); return true; } catch (e) { console.error(e); alert("좋아요 취소 실패: " + e.message); return false; }
 }
-async function addComment(ideaId, author, body) {
-  if (DEMO) { const full = { id: uid(), created_at: new Date().toISOString(), idea_id: ideaId, author, body }; demoComments.push(full); return full; }
-  try { return await api.addComment(ideaId, author, body); } catch (e) { console.error(e); return null; }
+async function addComment(ideaId, author, body, opts = {}) {
+  if (DEMO) { const full = { id: uid(), created_at: new Date().toISOString(), idea_id: ideaId, author, body, parent_id: opts.parent_id || null, sentiment: opts.sentiment || null }; demoComments.push(full); return full; }
+  try { return await api.addComment(ideaId, author, body, opts); } catch (e) { console.error(e); return null; }
 }
 async function updateComment(id, body) {
   if (DEMO) { const c = demoComments.find((x) => x.id === id); if (c) c.body = body; return true; }
@@ -165,13 +167,31 @@ function renderMe() {
   chip.textContent = state.me ? (state.reveal ? `${state.me} · 전체열람` : state.me) : "이름 설정";
   chip.classList.toggle("reveal", state.reveal);
 }
+// 정적 버튼들에 Phosphor 아이콘 주입 (플랫폼 전체 아이콘 통일)
+function setupIcons() {
+  const set = (sel, name, size) => { const el = document.querySelector(sel); if (el) el.innerHTML = icon(name, size); };
+  set("#archive-btn .nb-ico", "archive", 18);
+  set("#split-btn .nb-ico", "columns", 18);
+  set("#list-btn .nb-ico", "list", 18);
+  const fab = $("#fab"); if (fab) fab.innerHTML = icon("plus", 28);
+  ["#card-close", "#list-close", "#archive-close", "#split-close"].forEach((s) => set(s, "x", 20));
+  const mqr = $("#mq-return"); if (mqr) mqr.innerHTML = `${icon("arrow-left", 15)}<span>현재 라운드로</span>`;
+}
+function updateThemeIcon() {
+  const btn = $("#theme-btn"); if (!btn) return;
+  const dark = document.documentElement.getAttribute("data-theme") !== "light";
+  const ic = btn.querySelector(".nb-ico"); if (ic) ic.innerHTML = icon(dark ? "sun" : "moon", 18);
+  const lbl = btn.querySelector(".nb-label"); if (lbl) lbl.textContent = dark ? "라이트" : "다크";
+}
 function initTheme() {
-  const saved = localStorage.getItem("axdea_theme");
-  if (saved) document.documentElement.setAttribute("data-theme", saved);
+  const saved = localStorage.getItem("axdea_theme") || "dark"; // 기본 다크(네온)
+  document.documentElement.setAttribute("data-theme", saved);
+  updateThemeIcon();
   $("#theme-btn").onclick = () => {
-    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    const next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
     document.documentElement.setAttribute("data-theme", next);
     localStorage.setItem("axdea_theme", next);
+    updateThemeIcon();
   };
 }
 
@@ -207,7 +227,11 @@ function makeChar(idea) {
   el.innerHTML = `
     <div class="char-halo"><i></i></div>
     <div class="char-ball" style="--ball:${idea.color}"><img alt="" src="${avatarUrl(idea.avatar_style, idea.avatar_seed)}" /></div>
-    <div class="char-badge">${catOf(idea.category).label}</div>`;
+    <div class="char-info">
+      <span class="ci-cat" style="--cat-hue:${catOf(idea.category).hue}">${catOf(idea.category).label}</span>
+      <span class="ci-count ci-like" hidden></span>
+      <span class="ci-count ci-cmt" hidden></span>
+    </div>`;
   // 오브제마다 랜덤 idle 애니메이션 부여 (공에만)
   const ball = el.querySelector(".char-ball");
   const ANIMS = ["anim-spin", "anim-wobble", "anim-pulse", "anim-float", "anim-jelly", "anim-sway", "anim-heartbeat", "anim-swing"];
@@ -220,11 +244,11 @@ function makeChar(idea) {
   const r = R();
   const body = {
     x: r + Math.random() * Math.max(1, W - 2 * r),
-    y: r + Math.random() * Math.max(1, H - 2 * r),
+    y: TOP_INSET + r + Math.random() * Math.max(1, H - TOP_INSET - 2 * r),
     vx: (Math.random() - 0.5) * 2.4,
     vy: (Math.random() - 0.5) * 2.4,
     r, baseR: r, scale: 1, el, dragging: false,
-    panel: "all", hidden: false, region: { x0: 0, y0: 0, x1: W, y1: H },
+    panel: "all", hidden: false, region: { x0: 0, y0: TOP_INSET, x1: W, y1: H },
   };
   state.bodies.set(idea.id, body);
   applyRejected(idea.id);
@@ -251,8 +275,8 @@ function updateCharVisual(id) {
   b.el.style.setProperty("--cat-hue", catOf(idea.category).hue);
   const ball = b.el.querySelector(".char-ball");
   if (ball) ball.style.setProperty("--ball", idea.color);
-  const badge = b.el.querySelector(".char-badge");
-  if (badge) badge.textContent = catOf(idea.category).label;
+  const cat = b.el.querySelector(".ci-cat");
+  if (cat) { cat.textContent = catOf(idea.category).label; cat.style.setProperty("--cat-hue", catOf(idea.category).hue); }
   applyRejected(id);
 }
 // 캐릭터에 좋아요/댓글 수 표시 (0/0이면 숨김)
@@ -267,10 +291,9 @@ function updateCharCounts(id) {
   const orbiting = l >= 3;
   b.el.classList.toggle("orbiting", orbiting);
   if (orbiting) b.el.style.setProperty("--orbit-dur", Math.max(1.1, 2.8 - l * 0.12).toFixed(2) + "s");
-  let pill = b.el.querySelector(".char-counts");
-  if (l === 0 && c === 0) { if (pill) pill.remove(); return; }
-  if (!pill) { pill = document.createElement("div"); pill.className = "char-counts"; b.el.appendChild(pill); }
-  pill.innerHTML = `${l ? `<span class="cc-like">♥ ${l}</span>` : ""}${c ? `<span class="cc-cmt">💬 ${c}</span>` : ""}`;
+  const like = b.el.querySelector(".ci-like"), cmt = b.el.querySelector(".ci-cmt");
+  if (like) { if (l > 0) { like.innerHTML = `${icon("heart-fill", 12)}${l}`; like.hidden = false; } else like.hidden = true; }
+  if (cmt) { if (c > 0) { cmt.innerHTML = `${icon("chat-circle", 12)}${c}`; cmt.hidden = false; } else cmt.hidden = true; }
 }
 async function refreshCounts() {
   const { cc, lc, mine } = await loadCounts();
@@ -285,8 +308,8 @@ function renderSocial(id) {
   const liked = state.myLikes.has(id);
   const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
   box.innerHTML =
-    `<button class="like-btn${liked ? " on" : ""}" id="like-btn">${liked ? "♥" : "♡"} <b>${l}</b> 좋아요</button>` +
-    `<span class="cmt-count">💬 댓글 ${c}</span>`;
+    `<button class="like-btn${liked ? " on" : ""}" id="like-btn">${icon(liked ? "heart-fill" : "heart", 17)}<b>${l}</b> 좋아요</button>` +
+    `<span class="cmt-count">${icon("chat-circle", 16)} 댓글 ${c}</span>`;
   document.getElementById("like-btn").onclick = () => toggleLike(id);
 }
 async function toggleLike(id) {
@@ -373,10 +396,11 @@ function computeRegions() {
 function renderPanels(regions) {
   const box = $("#panels");
   if (!regions) { box.innerHTML = ""; return; }
-  box.innerHTML = state.splitRounds.map((rnd) => {
+  box.innerHTML = state.splitRounds.map((rnd, i) => {
     const rg = regions[rnd];
-    const count = state.ideas.filter((i) => (i.round || "lab-day") === rnd).length;
-    return `<div class="panel round-panel" style="left:${rg.x0}px;top:${rg.y0}px;width:${rg.x1 - rg.x0}px;height:${rg.y1 - rg.y0}px">
+    const color = PANEL_COLORS[i % PANEL_COLORS.length];
+    const count = state.ideas.filter((x) => (x.round || "lab-day") === rnd).length;
+    return `<div class="panel round-panel" style="left:${rg.x0}px;top:${rg.y0}px;width:${rg.x1 - rg.x0}px;height:${rg.y1 - rg.y0}px;--led:${color}">
       <div class="panel-head"><i class="ph-led"></i><span class="ph-name">${esc((rnd || "").toUpperCase())}</span><span class="panel-count">${count}</span></div>
     </div>`;
   }).join("");
@@ -390,11 +414,12 @@ function relayout() {
     const idea = state.ideas.find((i) => i.id === id);
     const rnd = idea ? (idea.round || "lab-day") : null;
     if (split && rnd && regions[rnd]) {
-      b.hidden = false; b.panel = rnd; b.region = regions[rnd];
+      const rg = regions[rnd];
+      b.hidden = false; b.panel = rnd; b.region = { x0: rg.x0, y0: rg.y0 + 46, x1: rg.x1, y1: rg.y1 };
     } else if (split) {
       b.hidden = true;
     } else {
-      b.hidden = false; b.panel = "all"; b.region = { x0: 0, y0: 0, x1: W, y1: H };
+      b.hidden = false; b.panel = "all"; b.region = { x0: 0, y0: TOP_INSET, x1: W, y1: H };
     }
     b.el.style.display = b.hidden ? "none" : "";
     if (!b.hidden) {
@@ -454,53 +479,64 @@ async function openSplit() {
   $("#split-modal").hidden = false;
 }
 
-// 하단 고양이: 가장 가까운 공을 쫓아 툭툭 쳐서 논다
+// 고양이: 아이디어를 쫓아가 폴짝 올라타 포근하게 앉아있다가 다른 아이디어로 이동
 function initCat() {
   const el = $("#cat");
   const { W, H } = stageSize();
-  state.cat = { x: W * 0.35, y: H - 46, vx: 1.4, dir: 1, targetId: null, cooldown: 0, el };
+  state.cat = { x: W * 0.35, y: H - 46, vx: 1.4, dir: 1, targetId: null, mode: "seek", sit: 0, el };
+}
+function hopCat(cat) {
+  cat.el.classList.remove("pounce");
+  void cat.el.offsetWidth; // 리플로우로 애니메이션 재시작
+  cat.el.classList.add("pounce");
+  setTimeout(() => cat.el.classList.remove("pounce"), 420);
 }
 function updateCat(W, H) {
   const cat = state.cat;
   if (!cat) return;
   const baseY = H - 46;
-  cat.cooldown = Math.max(0, cat.cooldown - 1);
-
-  // 타겟(가장 가까운 공, 하단 가중치) 재선정
-  if (!cat.targetId || !state.bodies.has(cat.targetId) || cat.cooldown === 0) {
-    let best = null, bd = Infinity;
-    state.bodies.forEach((b, id) => {
-      if (b.dragging) return;
-      const d = Math.abs(b.x - cat.x) + Math.abs(b.y - baseY) * 0.6;
-      if (d < bd) { bd = d; best = id; }
-    });
-    if (cat.cooldown === 0 || !cat.targetId) cat.targetId = best;
-  }
   const target = cat.targetId ? state.bodies.get(cat.targetId) : null;
 
-  if (target && !target.dragging) {
-    const dx = target.x - cat.x;
-    cat.vx = Math.max(-3.6, Math.min(3.6, dx * 0.05));
+  // 앉아있는 중: 아이디어 위에 포근하게 얹혀 함께 이동
+  if (cat.mode === "riding" && target && !target.dragging && !target.hidden) {
+    const topY = target.y - target.r - 14;
+    cat.x += (target.x - cat.x) * 0.4;
+    cat.y += (topY - cat.y) * 0.4;
+    cat.sit -= 1;
+    cat.el.classList.add("sitting");
+    if (cat.sit <= 0) { cat.mode = "seek"; cat.targetId = null; hopCat(cat); }
+    cat.el.style.transform = `translate(${cat.x}px, ${cat.y}px) scaleX(${cat.dir})`;
+    return;
+  }
+  cat.el.classList.remove("sitting");
+
+  // 쫓아가기: 타겟 선정(가장 가까운 아이디어)
+  if (!target || target.dragging || target.hidden) {
+    let best = null, bd = Infinity;
+    state.bodies.forEach((b, id) => {
+      if (b.dragging || b.hidden) return;
+      const d = Math.abs(b.x - cat.x) + Math.abs(b.y - cat.y) * 0.7;
+      if (d < bd) { bd = d; best = id; }
+    });
+    cat.targetId = best;
+  }
+  const tgt = cat.targetId ? state.bodies.get(cat.targetId) : null;
+  if (tgt) {
+    const dx = tgt.x - cat.x;
+    cat.vx = Math.max(-3.8, Math.min(3.8, dx * 0.06));
     if (Math.abs(cat.vx) > 0.25) cat.dir = cat.vx > 0 ? 1 : -1;
     cat.x += cat.vx;
-    // 하단부에 있는 공까지 살짝 뛰어오름
-    const desiredY = Math.max(H * 0.5, Math.min(baseY, target.y));
-    cat.y += (desiredY - cat.y) * 0.09;
-    // 닿으면 공을 위로 튕겨 올림(공놀이)
-    const dist = Math.hypot(target.x - cat.x, target.y - cat.y);
-    if (dist < target.r + 42 && cat.cooldown === 0) {
-      const away = Math.sign(target.x - cat.x) || (Math.random() < 0.5 ? 1 : -1);
-      target.vx = away * (4 + Math.random() * 4);
-      target.vy = -(7 + Math.random() * 5);
-      cat.cooldown = 55;
-      cat.el.classList.add("pounce");
-      setTimeout(() => cat.el.classList.remove("pounce"), 280);
-      cat.targetId = null;
+    const topY = tgt.y - tgt.r - 14;
+    cat.y += (topY - cat.y) * 0.13;
+    if (Math.hypot(tgt.x - cat.x, tgt.y - cat.y) < tgt.r + 22) {
+      cat.mode = "riding";           // 올라타 앉기
+      cat.sit = 260 + Math.floor(Math.random() * 220); // ~4~8초
+      hopCat(cat);
     }
   } else {
     cat.x += cat.vx;
     if (cat.x < 44 || cat.x > W - 44) cat.vx *= -1;
-    cat.y += (baseY - cat.y) * 0.09;
+    cat.y += (baseY - cat.y) * 0.08;
   }
   cat.x = Math.max(30, Math.min(W - 30, cat.x));
   cat.el.style.transform = `translate(${cat.x}px, ${cat.y}px) scaleX(${cat.dir})`;
@@ -592,28 +628,87 @@ async function openCard(id) {
     if (isOwner || state.reveal) $("#del-btn").onclick = () => removeIdea(id);
   }
   $("#comment-form").style.display = "";
+  const csp = $("#comment-sent");
+  if (csp) { csp.innerHTML = sentButtonsHTML(); state.cSent = null; wireSentPicker(csp, (s) => { state.cSent = s; }); }
   renderSocial(id);
   $("#card-modal").hidden = false;
   renderComments(await loadComments(id));
+}
+function sentimentBadge(s) {
+  if (s === "pos") return `<span class="c-sent pos">${icon("thumbs-up-fill", 13)}긍정</span>`;
+  if (s === "neg") return `<span class="c-sent neg">${icon("thumbs-down-fill", 13)}부정</span>`;
+  return "";
+}
+function commentNode(c, isReply) {
+  const mine = !!state.me && c.author === state.me;
+  const ctrls =
+    (mine ? `<button class="c-act" data-act="edit" data-id="${c.id}">수정</button>` : "") +
+    (mine || state.reveal ? `<button class="c-act" data-act="del" data-id="${c.id}">삭제</button>` : "") +
+    (!isReply ? `<button class="c-act" data-act="reply" data-id="${c.id}">${icon("arrow-bend-down-right", 13)}답글</button>` : "");
+  return `<div class="comment${isReply ? " reply" : ""}" data-id="${c.id}">
+    <div class="c-main">${sentimentBadge(c.sentiment)}${state.reveal ? `<span class="c-author">${esc(c.author)}</span>` : ""}<span class="c-body">${esc(c.body)}</span></div>
+    ${ctrls ? `<div class="c-actions">${ctrls}</div>` : ""}
+  </div>`;
 }
 function renderComments(list) {
   const box = $("#card-comments");
   state.openComments = list;
   if (!list.length) { box.innerHTML = `<div class="comment-empty">첫 댓글을 남겨보세요.</div>`; return; }
-  box.innerHTML = list.map((c) => {
-    const mine = !!state.me && c.author === state.me;
-    const ctrls =
-      (mine ? `<button class="c-act" data-act="edit" data-id="${c.id}">수정</button>` : "") +
-      (mine || state.reveal ? `<button class="c-act" data-act="del" data-id="${c.id}">삭제</button>` : "");
-    return `<div class="comment" data-id="${c.id}">
-      <div class="c-main">${state.reveal ? `<span class="c-author">${esc(c.author)}</span>` : ""}<span class="c-body">${esc(c.body)}</span></div>
-      ${ctrls ? `<div class="c-actions">${ctrls}</div>` : ""}
-    </div>`;
+  const tops = list.filter((c) => !c.parent_id);
+  const byParent = {};
+  list.filter((c) => c.parent_id).forEach((c) => { (byParent[c.parent_id] = byParent[c.parent_id] || []).push(c); });
+  box.innerHTML = tops.map((c) => {
+    const replies = (byParent[c.id] || []).map((r) => commentNode(r, true)).join("");
+    return commentNode(c, false) + (replies ? `<div class="c-replies">${replies}</div>` : "");
   }).join("");
   box.querySelectorAll(".c-act").forEach((btn) => {
-    btn.onclick = () => (btn.dataset.act === "edit" ? startEditComment(btn.dataset.id) : removeComment(btn.dataset.id));
+    btn.onclick = () => {
+      const act = btn.dataset.act, cid = btn.dataset.id;
+      if (act === "edit") startEditComment(cid);
+      else if (act === "del") removeComment(cid);
+      else if (act === "reply") startReply(cid);
+    };
   });
   box.scrollTop = box.scrollHeight;
+}
+// 감정 선택기(긍정/부정) — 공용
+function sentButtonsHTML() {
+  return `<button type="button" class="sent-btn pos" data-s="pos" title="긍정">${icon("thumbs-up", 15)}<span>긍정</span></button><button type="button" class="sent-btn neg" data-s="neg" title="부정">${icon("thumbs-down", 15)}<span>부정</span></button>`;
+}
+function sentPickerHTML() { return `<div class="sent-pick">${sentButtonsHTML()}</div>`; }
+function wireSentPicker(root, onChange) {
+  let cur = null;
+  root.querySelectorAll(".sent-btn").forEach((b) => {
+    b.onclick = () => {
+      cur = cur === b.dataset.s ? null : b.dataset.s;
+      root.querySelectorAll(".sent-btn").forEach((x) => x.classList.toggle("on", x.dataset.s === cur));
+      onChange(cur);
+    };
+  });
+}
+function startReply(parentId) {
+  if (!state.me) { openNameModal(); return; }
+  const node = document.querySelector(`#card-comments .comment[data-id="${parentId}"]`);
+  if (!node || (node.nextElementSibling && node.nextElementSibling.classList.contains("c-replyform"))) return;
+  const form = document.createElement("div");
+  form.className = "c-replyform";
+  form.innerHTML = `<input type="text" class="reply-input" maxlength="300" placeholder="답글 남기기…" autocomplete="off" />${sentPickerHTML()}<button class="btn c-reply-send">등록</button>`;
+  node.after(form);
+  let sent = null;
+  wireSentPicker(form, (s) => { sent = s; });
+  const input = form.querySelector(".reply-input");
+  input.focus();
+  const send = async () => {
+    const v = input.value.trim();
+    if (!v) return;
+    await addComment(state.openId, state.me, v, { parent_id: parentId, sentiment: sent });
+    state.commentCounts[state.openId] = (state.commentCounts[state.openId] || 0) + 1;
+    updateCharCounts(state.openId);
+    renderSocial(state.openId);
+    renderComments(await loadComments(state.openId));
+  };
+  form.querySelector(".c-reply-send").onclick = send;
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
 }
 function startEditComment(id) {
   const c = (state.openComments || []).find((x) => x.id === id);
@@ -741,28 +836,44 @@ async function saveIdea() {
 
 // ---------- 전체 아이디어 목록 ----------
 function openList() {
-  const box = $("#list-items");
-  const items = [...state.ideas].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  $("#list-count").textContent = `(${items.length})`;
-  box.innerHTML = items.length
-    ? items.map((i) => {
-        const cat = catOf(i.category);
-        const rj = isRejected(i);
-        const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
-        const l = state.likeCounts[i.id] || 0, c = state.commentCounts[i.id] || 0;
-        const mine = !!state.me && i.author === state.me;
-        return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}" data-id="${i.id}">
-          <span class="li-dot" style="background:${i.color}"></span>
-          <span class="li-title">${esc(i.title)}${mine ? ` <span class="li-mine">내 글</span>` : ""}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
-          <span class="li-counts">♥ ${l} · 💬 ${c}</span>
-          <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
-          ${author}
-        </button>`;
-      }).join("")
-    : `<div class="comment-empty">아직 아이디어가 없어요.</div>`;
-  box.querySelectorAll(".list-item").forEach((el) => {
-    el.onclick = () => { $("#list-modal").hidden = true; openCard(el.dataset.id); };
-  });
+  if (!state.listSort) state.listSort = "likes"; // 기본 좋아요순
+  const sortItems = () => {
+    const items = [...state.ideas];
+    const L = (i) => state.likeCounts[i.id] || 0, C = (i) => state.commentCounts[i.id] || 0;
+    if (state.listSort === "comments") items.sort((a, b) => C(b) - C(a) || L(b) - L(a));
+    else if (state.listSort === "name") items.sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "ko"));
+    else items.sort((a, b) => L(b) - L(a) || C(b) - C(a) || new Date(b.created_at) - new Date(a.created_at));
+    return items;
+  };
+  const render = () => {
+    const items = sortItems();
+    $("#list-count").textContent = `(${items.length})`;
+    const sortBar = $("#list-sort");
+    if (sortBar) {
+      const opt = (k, label) => `<button class="ls-btn${state.listSort === k ? " on" : ""}" data-sort="${k}">${label}</button>`;
+      sortBar.innerHTML = `<span class="ls-label">정렬</span>${opt("likes", "좋아요순")}${opt("comments", "댓글순")}${opt("name", "이름순")}`;
+      sortBar.querySelectorAll(".ls-btn").forEach((b) => (b.onclick = () => { state.listSort = b.dataset.sort; render(); }));
+    }
+    const box = $("#list-items");
+    box.innerHTML = items.length
+      ? items.map((i) => {
+          const cat = catOf(i.category), rj = isRejected(i), mine = !!state.me && i.author === state.me;
+          const l = state.likeCounts[i.id] || 0, c = state.commentCounts[i.id] || 0;
+          const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
+          return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}" data-id="${i.id}">
+            <span class="li-dot" style="background:${i.color}"></span>
+            <span class="li-title">${esc(i.title)}${mine ? ` <span class="li-mine">내 글</span>` : ""}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
+            <span class="li-counts">${icon("heart-fill", 13)}${l} ${icon("chat-circle", 13)}${c}</span>
+            <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
+            ${author}
+          </button>`;
+        }).join("")
+      : `<div class="comment-empty">아직 아이디어가 없어요.</div>`;
+    box.querySelectorAll(".list-item").forEach((el) => {
+      el.onclick = () => { $("#list-modal").hidden = true; openCard(el.dataset.id); };
+    });
+  };
+  render();
   $("#list-modal").hidden = false;
 }
 
@@ -804,7 +915,7 @@ async function openArchive() {
   box.innerHTML = rounds.map((r) => {
     const active = r.round === state.activeRound;
     const viewing = r.round === state.viewRound;
-    const renameBtn = state.reveal ? `<button class="round-edit" data-rename="${esc(r.round)}" title="이름 변경">✎</button>` : "";
+    const renameBtn = state.reveal ? `<button class="round-edit" data-rename="${esc(r.round)}" title="이름 변경">${icon("pencil-simple", 15)}</button>` : "";
     return `<div class="list-item round-item${viewing ? " viewing" : ""}" data-round="${esc(r.round)}">
       <span class="round-name">${esc(r.round)}</span>
       <span class="round-badge${active ? " live" : ""}">${active ? "진행 중" : "아카이브"}</span>
@@ -910,11 +1021,20 @@ $("#comment-form").addEventListener("submit", async (e) => {
   if (!body || !state.openId) return;
   input.value = "";
   const id = state.openId;
-  await addComment(id, state.me, body);
+  await addComment(id, state.me, body, { sentiment: state.cSent });
+  state.cSent = null;
+  const sp = $("#comment-sent"); if (sp) sp.querySelectorAll(".sent-btn").forEach((x) => x.classList.remove("on"));
   state.commentCounts[id] = (state.commentCounts[id] || 0) + 1;
   updateCharCounts(id);
   renderSocial(id);
   renderComments(await loadComments(id));
+});
+// 댓글: Enter=등록, Shift+Enter=줄바꿈
+$("#comment-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    $("#comment-form").requestSubmit();
+  }
 });
 // 스크림 클릭으로 닫기
 document.querySelectorAll(".modal-scrim").forEach((scrim) => {
@@ -977,6 +1097,7 @@ function showDemoBanner() {
   document.body.appendChild(b);
 }
 async function boot() {
+  setupIcons();
   initTheme();
   renderFilters();
   renderMe();

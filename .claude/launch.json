@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "axdea",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8000"],
-      "port": 8000
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/dip/Documents/AXdea/apps/web", "run", "dev"],
+      "port": 5114
     }
   ]
 }

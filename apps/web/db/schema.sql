@@ -6,9 +6,11 @@ create table if not exists ideas (
   created_at datetime(6), round varchar(255) default 'lab-day', status varchar(32) default 'open'
 ) engine=InnoDB default charset=utf8mb4;
 create table if not exists comments (
-  id char(36) primary key, idea_id char(36), author varchar(255) not null, body text not null, created_at datetime(6),
-  key idx_comments_idea (idea_id),
-  constraint fk_comments_idea foreign key (idea_id) references ideas(id) on delete cascade
+  id char(36) primary key, idea_id char(36), parent_id char(36) null, author varchar(255) not null,
+  body text not null, sentiment varchar(16) null, created_at datetime(6),
+  key idx_comments_idea (idea_id), key idx_comments_parent (parent_id),
+  constraint fk_comments_idea foreign key (idea_id) references ideas(id) on delete cascade,
+  constraint fk_comments_parent foreign key (parent_id) references comments(id) on delete cascade
 ) engine=InnoDB default charset=utf8mb4;
 create table if not exists likes (
   idea_id char(36), voter varchar(255) not null, created_at datetime(6),
