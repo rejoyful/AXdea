@@ -156,8 +156,22 @@ app.use((err, req, res, next) => {
 // 앱 정적 파일 (레포 루트 = 상위 폴더)
 app.use(express.static(path.resolve(__dirname, '..')));
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', async () => {
   const dbHost = process.env.DB_HOST || '192.168.100.76';
   const dbPort = process.env.DB_PORT || 3306;
   console.log(`AXdea 웹서버 실행: http://0.0.0.0:${PORT}  →  DB(원격) ${dbHost}:${dbPort}/${process.env.DB_NAME || 'axdea'}`);
+  // 부팅 시 DB 연결 자가진단 (실패해도 서버는 유지 — 요청 시 자동 재시도)
+  try { await q('select 1'); console.log('✅ DB 연결 정상'); }
+  catch (e) { console.error(`⚠️  DB 연결 실패: ${e.message}\n   → ${dbHost}:${dbPort} 네트워크/방화벽/비밀번호를 확인하세요. (웹서버는 계속 대기)`); }
 });
+
+// 예기치 못한 에러로 프로세스가 죽지 않게 (pm2/systemd가 재시작하더라도 로그 남김)
+process.on('unhandledRejection', (e) => console.error('[unhandledRejection]', e));
+// 우아한 종료 (pm2/systemd 재시작·배포 시)
+for (const sig of ['SIGTERM', 'SIGINT']) {
+  process.on(sig, () => {
+    console.log(`\n${sig} 수신 — 종료 중...`);
+    server.close(() => pool.end().then(() => process.exit(0)).catch(() => process.exit(0)));
+    setTimeout(() => process.exit(0), 5000).unref();
+  });
+}

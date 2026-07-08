@@ -34,33 +34,38 @@ Express 서버 하나가 **앱(정적 파일) + `/api`** 를 함께 서빙하고
 
 ## 도메인 연결 (axdea.hakjisa.kr → Express)
 
-Express는 **5114** 포트에서 뜹니다. 도메인·HTTPS는 **리버스 프록시(nginx 등)** 로 앞단에서 연결합니다.
-
-nginx 예시:
-```nginx
-server {
-  server_name axdea.hakjisa.kr;
-  location / {
-    proxy_pass http://127.0.0.1:5114;   # Express 웹서버
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $remote_addr;
-  }
-  # 인증서(HTTPS)는 certbot 등으로 발급 후 listen 443 ssl 설정
-}
+Express는 **5114** 포트에서 뜹니다. 도메인·HTTPS는 **리버스 프록시(nginx)** 로 앞단에서 연결합니다.
+준비된 설정 파일: **`deploy/nginx-axdea.conf`**
 ```
-- DNS: `axdea.hakjisa.kr` A레코드 → 웹서버 IP(192.168.100.105)
-- HTTPS 인증서: Let's Encrypt(certbot) 권장
+sudo cp deploy/nginx-axdea.conf /etc/nginx/sites-available/axdea
+sudo ln -s /etc/nginx/sites-available/axdea /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d axdea.hakjisa.kr     # HTTPS 자동 설정
+```
+- DNS: `axdea.hakjisa.kr` A레코드 → 웹서버 IP(**192.168.100.105**)
+- HTTPS 인증서: Let's Encrypt(certbot)
 
-## 상시 구동 (권장)
+## 상시 구동 (택1)
 
+**A. pm2 (권장)** — 준비된 `ecosystem.config.js` 사용:
 ```
 npm install -g pm2
 cd server
-pm2 start server.js --name axdea
+pm2 start ecosystem.config.js
 pm2 save
 pm2 startup     # 안내되는 명령 1줄 실행 → 부팅 시 자동 시작
 ```
-로그: `pm2 logs axdea` · 재시작: `pm2 restart axdea`
+로그: `pm2 logs axdea` · 재시작: `pm2 restart axdea` · 상태: `pm2 status`
+
+**B. systemd** — `deploy/axdea.service` 참고(경로/사용자만 수정):
+```
+sudo cp deploy/axdea.service /etc/systemd/system/axdea.service
+sudo systemctl daemon-reload && sudo systemctl enable --now axdea
+journalctl -u axdea -f
+```
+
+> 서버는 부팅 시 DB 연결을 자가진단합니다. 로그에 `✅ DB 연결 정상` 이 뜨면 OK,
+> `⚠️ DB 연결 실패` 면 105→76:3306 네트워크/방화벽/비밀번호를 확인하세요.
 
 ## 환경변수 (`server/.env`)
 
