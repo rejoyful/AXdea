@@ -1210,17 +1210,19 @@ async function openArchive() {
     const active = r.round === state.activeRound;
     const viewing = r.round === state.viewRound;
     const renameBtn = state.reveal ? `<button class="round-edit" data-rename="${esc(r.round)}" title="이름 변경">${icon("pencil-simple", 15)}</button>` : "";
-    return `<button class="round-card${viewing ? " viewing" : ""}${active ? " live" : ""}" data-round="${esc(r.round)}">
+    return `<div class="round-card${viewing ? " viewing" : ""}${active ? " live" : ""}" data-round="${esc(r.round)}" role="button" tabindex="0">
       <div class="rc-head">
         <span class="round-badge${active ? " live" : ""}">${active ? "진행 중" : "아카이브"}</span>
         ${renameBtn}
       </div>
       <div class="round-name">${esc(r.round)}</div>
       <div class="round-count">${icon("archive", 13)}<span>아이디어 ${r.count}</span></div>
-    </button>`;
+    </div>`;
   }).join("");
   box.querySelectorAll(".round-card").forEach((el) => {
-    el.onclick = (e) => { if (e.target.closest(".round-edit")) return; selectRound(el.dataset.round); };
+    const go = (e) => { if (e.target.closest(".round-edit")) return; selectRound(el.dataset.round); };
+    el.onclick = go;
+    el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(e); } };
   });
   box.querySelectorAll(".round-edit").forEach((btn) => {
     btn.onclick = (e) => { e.stopPropagation(); renameRound(btn.dataset.rename); };
