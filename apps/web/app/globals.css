@@ -715,6 +715,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .c-sent svg { display: block; }
 .c-sent.pos { color: #05121a; background: var(--neon-lime); }
 .c-sent.neg { color: #fff; background: var(--neon-magenta); }
+.c-sent.coffee { color: #4a2f00; background: var(--coffee); }
 
 /* 대댓글: 왼쪽 들여쓰기 + 세로선 */
 .c-replies { margin: -2px 0 6px 20px; padding-left: 12px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
@@ -738,6 +739,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .sent-btn:hover { border-color: var(--border-strong); color: var(--text); }
 .sent-btn.pos.on { color: #05121a; background: var(--neon-lime); border-color: transparent; box-shadow: 0 0 12px color-mix(in srgb, var(--neon-lime) 45%, transparent); }
 .sent-btn.neg.on { color: #fff; background: var(--neon-magenta); border-color: transparent; box-shadow: 0 0 12px color-mix(in srgb, var(--neon-magenta) 45%, transparent); }
+.sent-btn.coffee.on { color: #4a2f00; background: var(--coffee); border-color: transparent; box-shadow: 0 0 12px color-mix(in srgb, var(--coffee) 45%, transparent); }
 
 /* 댓글 작성 영역 (더 크게) */
 .comment-form { display: flex; flex-direction: column; margin-bottom: 12px; }

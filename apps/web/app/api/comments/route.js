@@ -11,7 +11,7 @@ export const POST = handler(async (req) => {
   const b = await req.json();
   if (!b.idea_id || !b.author || !b.body) return json({ error: "idea_id/author/body required" }, 400);
   const id = randomUUID();
-  const sentiment = b.sentiment === "pos" || b.sentiment === "neg" ? b.sentiment : null;
+  const sentiment = ["pos", "neg", "coffee"].includes(b.sentiment) ? b.sentiment : null;
   const parent_id = b.parent_id || null;
   await q("insert into comments (id,idea_id,parent_id,author,body,sentiment,created_at) values (?,?,?,?,?,?,UTC_TIMESTAMP(6))",
     [id, b.idea_id, parent_id, b.author, b.body, sentiment]);

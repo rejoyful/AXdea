@@ -24,10 +24,9 @@ const state = {
   commentCounts: {},  // idea_id -> 댓글 수
   posCounts: {},      // idea_id -> 해보자 댓글 수
   negCounts: {},      // idea_id -> 아쉬워 댓글 수
-  likeCounts: {},     // idea_id -> 좋아요 수(누적)
-  coffeeCounts: {},   // idea_id -> 커피 수(누적)
+  coffeeCounts: {},   // idea_id -> '커피' 태그 댓글 수
+  likeCounts: {},     // idea_id -> 좋아요 수
   myLikes: new Set(), // 내가 좋아요 누른 적 있는 idea_id
-  myCoffees: new Set(), // 내가 커피 보낸 적 있는 idea_id
   cat: null,          // 고양이 상태
   roundsEnabled: false, // 아카이브 구조 사용 가능 여부(DB 감지)
   activeRound: "lab-day", // 현재 진행 중인 라운드
@@ -103,42 +102,32 @@ async function loadComments(ideaId) {
   if (DEMO) return demoComments.filter((c) => c.idea_id === ideaId);
   try { return await api.comments(ideaId); } catch (e) { console.error(e); return []; }
 }
-// 댓글 수 + 좋아요/커피 수(누적) + 내 반응 집계 (한 번에 로드)
+// 댓글 수 + 감정(해보자/아쉬워/커피) 수 + 좋아요 수 + 내 좋아요 집계 (한 번에 로드)
 async function loadCounts() {
   if (DEMO) {
-    const cc = {}, pc = {}, nc = {}, lc = {}, fc = {}, mine = new Set(), mineCoffee = new Set();
+    const cc = {}, pc = {}, nc = {}, fc = {}, lc = {}, mine = new Set();
     demoComments.forEach((c) => {
       cc[c.idea_id] = (cc[c.idea_id] || 0) + 1;
       if (c.sentiment === "pos") pc[c.idea_id] = (pc[c.idea_id] || 0) + 1;
       else if (c.sentiment === "neg") nc[c.idea_id] = (nc[c.idea_id] || 0) + 1;
+      else if (c.sentiment === "coffee") fc[c.idea_id] = (fc[c.idea_id] || 0) + 1;
     });
-    demoLikes.forEach((l) => {
-      if (l.kind === "coffee") { fc[l.idea_id] = (fc[l.idea_id] || 0) + 1; if (l.voter === state.me) mineCoffee.add(l.idea_id); }
-      else { lc[l.idea_id] = (lc[l.idea_id] || 0) + 1; if (l.voter === state.me) mine.add(l.idea_id); }
-    });
-    return { cc, pc, nc, lc, fc, mine, mineCoffee };
+    demoLikes.forEach((l) => { lc[l.idea_id] = (lc[l.idea_id] || 0) + 1; if (l.voter === state.me) mine.add(l.idea_id); });
+    return { cc, pc, nc, fc, lc, mine };
   }
   try {
     const d = await api.counts(state.me);
-    return { cc: d.commentCounts || {}, pc: d.posCounts || {}, nc: d.negCounts || {}, lc: d.likeCounts || {}, fc: d.coffeeCounts || {}, mine: new Set(d.myLikes || []), mineCoffee: new Set(d.myCoffees || []) };
-  } catch (e) { console.error(e); return { cc: {}, pc: {}, nc: {}, lc: {}, fc: {}, mine: new Set(), mineCoffee: new Set() }; }
+    return { cc: d.commentCounts || {}, pc: d.posCounts || {}, nc: d.negCounts || {}, fc: d.coffeeCounts || {}, lc: d.likeCounts || {}, mine: new Set(d.myLikes || []) };
+  } catch (e) { console.error(e); return { cc: {}, pc: {}, nc: {}, fc: {}, lc: {}, mine: new Set() }; }
 }
 // 반응 추가(누적, 취소 없음)
 async function likeIdea(id) {
   if (DEMO) { demoLikes.push({ idea_id: id, voter: state.me, kind: "like" }); return true; }
   try { await api.like(id, state.me); return true; } catch (e) { console.error(e); alert("좋아요 실패: " + e.message); return false; }
 }
-async function coffeeIdea(id) {
-  if (DEMO) { demoLikes.push({ idea_id: id, voter: state.me, kind: "coffee" }); return true; }
-  try { await api.coffee(id, state.me); return true; } catch (e) { console.error(e); alert("커피 전송 실패: " + e.message); return false; }
-}
 async function unlikeIdea(id) {
-  if (DEMO) { demoLikes = demoLikes.filter((l) => !(l.idea_id === id && l.voter === state.me && l.kind !== "coffee")); return true; }
+  if (DEMO) { demoLikes = demoLikes.filter((l) => !(l.idea_id === id && l.voter === state.me)); return true; }
   try { await api.unlike(id, state.me); return true; } catch (e) { console.error(e); alert("좋아요 취소 실패: " + e.message); return false; }
-}
-async function uncoffeeIdea(id) {
-  if (DEMO) { demoLikes = demoLikes.filter((l) => !(l.idea_id === id && l.voter === state.me && l.kind === "coffee")); return true; }
-  try { await api.uncoffee(id, state.me); return true; } catch (e) { console.error(e); alert("커피 취소 실패: " + e.message); return false; }
 }
 async function addComment(ideaId, author, body, opts = {}) {
   if (DEMO) { const full = { id: uid(), created_at: new Date().toISOString(), idea_id: ideaId, author, body, parent_id: opts.parent_id || null, sentiment: opts.sentiment || null }; demoComments.push(full); return full; }
@@ -369,8 +358,8 @@ function updateCharCounts(id) {
   if (cmt) { if (c > 0) { cmt.innerHTML = `${icon("chat-circle", 12)}${c}`; cmt.hidden = false; } else cmt.hidden = true; }
 }
 async function refreshCounts() {
-  const { cc, pc, nc, lc, fc, mine, mineCoffee } = await loadCounts();
-  state.commentCounts = cc; state.posCounts = pc; state.negCounts = nc; state.likeCounts = lc; state.coffeeCounts = fc; state.myLikes = mine; state.myCoffees = mineCoffee;
+  const { cc, pc, nc, fc, lc, mine } = await loadCounts();
+  state.commentCounts = cc; state.posCounts = pc; state.negCounts = nc; state.coffeeCounts = fc; state.likeCounts = lc; state.myLikes = mine;
   state.bodies.forEach((_, id) => updateCharCounts(id));
   if (state.openId) renderSocial(state.openId);
 }
@@ -384,16 +373,14 @@ function bumpBtn(elId) {
 function renderSocial(id) {
   const box = document.getElementById("card-social");
   if (!box) return;
-  const liked = state.myLikes.has(id), coffeed = state.myCoffees.has(id);
-  const l = state.likeCounts[id] || 0, f = state.coffeeCounts[id] || 0, c = state.commentCounts[id] || 0;
+  const liked = state.myLikes.has(id);
+  const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
   box.innerHTML =
     `<button class="like-btn${liked ? " on" : ""}" id="like-btn" title="좋아요">${icon(liked ? "heart-fill" : "heart", 17)}<b>${l}</b> 좋아요</button>` +
-    `<button class="coffee-btn${coffeed ? " on" : ""}" id="coffee-btn" title="커피 한잔 하자!">${icon(coffeed ? "coffee-fill" : "coffee", 17)}<b>${f}</b> 커피</button>` +
     `<span class="cmt-count" aria-label="댓글 ${c}개">${icon("chat-circle", 17)}<b>${c}</b> 댓글</span>`;
   document.getElementById("like-btn").onclick = () => toggleLike(id);
-  document.getElementById("coffee-btn").onclick = () => toggleCoffee(id);
 }
-// 좋아요/커피: 1인 1회 토글 — 누르면 반응, 다시 누르면 취소.
+// 좋아요: 1인 1회 토글 — 누르면 반응, 다시 누르면 취소.
 async function toggleLike(id) {
   if (!state.me) { openNameModal(); return; }
   const liked = state.myLikes.has(id);
@@ -402,15 +389,6 @@ async function toggleLike(id) {
   if (liked) { state.myLikes.delete(id); state.likeCounts[id] = Math.max(0, (state.likeCounts[id] || 1) - 1); }
   else { state.myLikes.add(id); state.likeCounts[id] = (state.likeCounts[id] || 0) + 1; }
   updateCharCounts(id); renderSocial(id); bumpBtn("like-btn");
-}
-async function toggleCoffee(id) {
-  if (!state.me) { openNameModal(); return; }
-  const coffeed = state.myCoffees.has(id);
-  const ok = coffeed ? await uncoffeeIdea(id) : await coffeeIdea(id);
-  if (!ok) return;
-  if (coffeed) { state.myCoffees.delete(id); state.coffeeCounts[id] = Math.max(0, (state.coffeeCounts[id] || 1) - 1); }
-  else { state.myCoffees.add(id); state.coffeeCounts[id] = (state.coffeeCounts[id] || 0) + 1; }
-  updateCharCounts(id); renderSocial(id); bumpBtn("coffee-btn");
 }
 // 내가 쓴 아이디어를 외관으로 표시 (강조 링 + '내 글' 태그) — 내 화면에만 보임
 function applyMine(id) {
@@ -820,6 +798,7 @@ async function openCard(id) {
 function sentimentBadge(s) {
   if (s === "pos") return `<span class="c-sent pos">${icon("thumbs-up-fill", 13)}해보자</span>`;
   if (s === "neg") return `<span class="c-sent neg">${icon("thumbs-down-fill", 13)}아쉬워</span>`;
+  if (s === "coffee") return `<span class="c-sent coffee">${icon("coffee-fill", 13)}커피</span>`;
   return "";
 }
 function commentNode(c, isReply) {
@@ -856,7 +835,11 @@ function renderComments(list) {
 }
 // 감정 선택기(해보자/아쉬워) — 공용
 function sentButtonsHTML() {
-  return `<button type="button" class="sent-btn pos" data-s="pos" title="해보자">${icon("thumbs-up", 15)}<span>해보자</span></button><button type="button" class="sent-btn neg" data-s="neg" title="아쉬워">${icon("thumbs-down", 15)}<span>아쉬워</span></button>`;
+  return (
+    `<button type="button" class="sent-btn pos" data-s="pos" title="해보자">${icon("thumbs-up", 15)}<span>해보자</span></button>` +
+    `<button type="button" class="sent-btn neg" data-s="neg" title="아쉬워">${icon("thumbs-down", 15)}<span>아쉬워</span></button>` +
+    `<button type="button" class="sent-btn coffee" data-s="coffee" title="커피 한잔 사줄게">${icon("coffee", 15)}<span>커피</span></button>`
+  );
 }
 function sentPickerHTML() { return `<div class="sent-pick">${sentButtonsHTML()}</div>`; }
 function wireSentPicker(root, onChange) {
@@ -1303,10 +1286,14 @@ $("#comment-form").addEventListener("submit", async (e) => {
   if (!body || !state.openId) return;
   input.value = "";
   const id = state.openId;
-  await addComment(id, state.me, body, { sentiment: state.cSent });
+  const sent = state.cSent;
+  await addComment(id, state.me, body, { sentiment: sent });
   state.cSent = null;
   const sp = $("#comment-sent"); if (sp) sp.querySelectorAll(".sent-btn").forEach((x) => x.classList.remove("on"));
   state.commentCounts[id] = (state.commentCounts[id] || 0) + 1;
+  if (sent === "coffee") state.coffeeCounts[id] = (state.coffeeCounts[id] || 0) + 1;
+  else if (sent === "pos") state.posCounts[id] = (state.posCounts[id] || 0) + 1;
+  else if (sent === "neg") state.negCounts[id] = (state.negCounts[id] || 0) + 1;
   updateCharCounts(id);
   renderSocial(id);
   renderComments(await loadComments(id));
