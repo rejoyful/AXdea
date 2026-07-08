@@ -17,9 +17,11 @@ if (fs.existsSync(envPath)) {
 }
 
 const PORT = Number(process.env.PORT || 8080);
+// ※ 웹서버와 DB서버는 서로 다른 위치(호스트)에 있습니다.
+//    이 서버(웹)는 아래 주소의 원격 MySQL(DB서버)로 네트워크 접속합니다.
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || '192.168.100.76',
-  port: Number(process.env.DB_PORT || 3306),
+  host: process.env.DB_HOST || '192.168.100.76',   // DB 서버 (웹서버와 다른 위치)
+  port: Number(process.env.DB_PORT || 5114),        // DB 포트
   user: process.env.DB_USER || 'axdea',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'axdea',
@@ -154,5 +156,7 @@ app.use((err, req, res, next) => {
 app.use(express.static(path.resolve(__dirname, '..')));
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`AXdea 서버 실행: http://0.0.0.0:${PORT}  (DB ${process.env.DB_HOST || '192.168.100.76'}/${process.env.DB_NAME || 'axdea'})`);
+  const dbHost = process.env.DB_HOST || '192.168.100.76';
+  const dbPort = process.env.DB_PORT || 5114;
+  console.log(`AXdea 웹서버 실행: http://0.0.0.0:${PORT}  →  DB(원격) ${dbHost}:${dbPort}/${process.env.DB_NAME || 'axdea'}`);
 });

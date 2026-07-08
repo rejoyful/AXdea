@@ -1,37 +1,58 @@
-# AXdea 백엔드 (사내망 전용)
+# AXdea 백엔드 (사내 서비스)
 
-Express 서버 하나가 **앱(정적 파일) + `/api`(MySQL)** 를 함께 서빙합니다.
-Supabase를 대체하며, 팀은 사내망에서 `http://192.168.100.76:8080` 로 접속합니다.
+Express 서버 하나가 **앱(정적 파일) + `/api`** 를 함께 서빙하고, 데이터는 **원격 DB서버의 MySQL**에 저장합니다.
+
+## 구성 (웹서버 ≠ DB서버, 서로 다른 위치)
 
 ```
-브라우저(앱)  ──/api──▶  Express(server.js)  ──▶  MySQL(axdea)
-        ▲ 정적파일 ──────────┘
+                 [ 웹서버 위치 ]                       [ DB서버 위치 ]
+브라우저 ─▶ https://axdea.hakjisa.kr ─(리버스프록시)─▶ Express(server.js) ──네트워크──▶ MySQL
+             (2차 도메인)                                앱 + /api               192.168.100.76:5114 / axdea
 ```
 
-## 서버(192.168.100.76)에 배포하기
+- **접속 도메인**: `axdea.hakjisa.kr` (2차 도메인) — 팀은 이 주소로 접속
+- **웹서버**: Express가 앱과 `/api`를 함께 서빙 (같은 오리진 → CORS 불필요)
+- **DB서버**: `192.168.100.76:5114` (MySQL, DB명 `axdea`) — **웹서버와 다른 위치**. 웹서버가 이 주소로 네트워크 접속
+- ⚠️ **웹서버에서 DB서버(192.168.100.76:5114)로 가는 네트워크 경로·방화벽이 열려 있어야** 합니다. (같은 사내망이라도 위치가 다르면 라우팅/방화벽 확인 필요)
 
-1. **Node.js 18+ 설치** (`node -v` 로 확인)
-2. 이 저장소를 서버에 복사(또는 `git clone`)
+## 배포 (웹서버에)
+
+1. **Node.js 18+ 설치** (`node -v`)
+2. 이 저장소를 웹서버에 복사/`git clone`
 3. 접속 정보 설정 — `server/` 에서:
    ```
    cp .env.example .env
-   # .env 를 열어 DB_PASSWORD 등 채우기
+   # .env 에 DB_HOST=192.168.100.76, DB_PORT=5114, DB_PASSWORD=... 채우기
    ```
-   (또는 실행 시 환경변수로 넘겨도 됩니다: `DB_PASSWORD=... node server.js`)
 4. 설치 & 실행:
    ```
    cd server
    npm install
    npm start
    ```
-   콘솔에 `AXdea 서버 실행: http://0.0.0.0:8080` 이 뜨면 정상.
-5. 팀은 브라우저에서 **http://192.168.100.76:8080** 접속.
+   콘솔에 `AXdea 웹서버 실행: http://0.0.0.0:8080 → DB(원격) 192.168.100.76:5114/axdea` 가 뜨면 정상.
 
-> 방화벽에서 **8080 포트(사내망)** 를 열어두세요. 포트는 `.env` 의 `PORT` 로 변경 가능.
+## 도메인 연결 (axdea.hakjisa.kr → Express)
+
+Express는 8080 포트에서 뜹니다. 도메인·HTTPS는 **리버스 프록시(nginx 등)** 로 앞단에서 연결합니다.
+
+nginx 예시:
+```nginx
+server {
+  server_name axdea.hakjisa.kr;
+  location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $remote_addr;
+  }
+  # 인증서(HTTPS)는 certbot 등으로 발급 후 listen 443 ssl 설정
+}
+```
+- DNS: `axdea.hakjisa.kr` A레코드 → 웹서버 IP
+- HTTPS 인증서: Let's Encrypt(certbot) 권장
 
 ## 상시 구동 (권장)
 
-`npm start` 는 터미널을 닫으면 종료됩니다. 재부팅에도 자동으로 뜨게 하려면 **pm2** 사용:
 ```
 npm install -g pm2
 cd server
@@ -45,9 +66,9 @@ pm2 startup     # 안내되는 명령 1줄 실행 → 부팅 시 자동 시작
 
 | 키 | 기본값 | 설명 |
 |---|---|---|
-| `PORT` | 8080 | 서버 포트 |
-| `DB_HOST` | 192.168.100.76 | MySQL 호스트 |
-| `DB_PORT` | 3306 | MySQL 포트 |
+| `PORT` | 8080 | 웹서버(Express) 포트 (리버스 프록시가 이 포트로 프록시) |
+| `DB_HOST` | 192.168.100.76 | **DB서버** 호스트 (웹서버와 다른 위치) |
+| `DB_PORT` | 5114 | DB 포트 |
 | `DB_USER` | axdea | MySQL 사용자 |
 | `DB_PASSWORD` | (필수) | MySQL 비밀번호 |
 | `DB_NAME` | axdea | 데이터베이스 |
@@ -62,6 +83,6 @@ pm2 startup     # 안내되는 명령 1줄 실행 → 부팅 시 자동 시작
 - `GET /api/counts?me=…`, `POST /api/likes`, `DELETE /api/likes?idea_id=&voter=`
 
 ## 참고
-- **실시간**: 앱이 4초 폴링으로 반영합니다(웹소켓 불필요).
-- **DB 스키마**: 이미 Supabase에서 이전 완료. 빈 DB에 새로 세팅할 땐 `schema.sql` 실행.
-- **인증**: 사내망 신뢰 기반이라 API에 별도 인증 없음. 외부 노출 시 인증/HTTPS를 추가하세요.
+- **실시간**: 앱이 4초 폴링으로 반영(웹소켓 불필요).
+- **DB 스키마**: 이미 이전 완료. 빈 DB에 새로 세팅할 땐 `schema.sql` 실행.
+- **인증**: 사내 신뢰 기반이라 API 자체 인증은 없음. 외부에 열 경우 인증/HTTPS를 반드시 추가.
