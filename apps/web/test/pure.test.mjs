@@ -6,8 +6,8 @@ import { isRevealer, sha256HexSync, pickAvatar, stepBody, resolveWall, resolveWa
 for (const s of ["", "a", "axdea2026", "pcy2026!", "lhw2026!", "한글코드!@#", "x".repeat(100)]) {
   assert.equal(sha256HexSync(s), createHash("sha256").update(s).digest("hex"), `sha256 mismatch: ${s}`);
 }
-// config에 박아둔 임시 해시가 실제 코드 해시와 맞는지
-assert.equal(sha256HexSync("axdea2026"), "7ead086cf2c2a0dec55a78e00bef7c1642c7fee377bcdfdfde4ba000a882405f");
+// config의 공용 입장코드 해시와 일치하는지 (코드 "2026")
+assert.equal(sha256HexSync("2026"), "158a323a7ba44870f23d96f1516dd70aa48e9a72db4ebb026b0a89e212a208ab");
 
 // 관리자(열람) 판정 — 박찬영 · 이해원
 assert.equal(isRevealer("박찬영"), true);

@@ -8,14 +8,13 @@ export const REVEAL_NAMES = ["박찬영", "이해원"];
 
 // ── 입장 코드(본인확인) ──────────────────────────────────────────────
 // 공개 레포이므로 코드 "원문"은 절대 저장하지 않고 SHA-256 해시만 둔다.
-// ⚠️ 아래는 임시 기본값(공용:axdea2026 / 박찬영:pcy2026! / 이해원:lhw2026!).
-//    실제 코드로 반드시 교체하세요. 코드를 알려주면 해시로 바꿔 드립니다.
+// 코드를 바꾸려면 Claude에게 알려주면 해시로 바꿔 준다(원문은 git에 안 남음).
 // 일반 멤버: 이름 + 공용 입장코드 → 입장
-export const ACCESS_CODE_HASH = "7ead086cf2c2a0dec55a78e00bef7c1642c7fee377bcdfdfde4ba000a882405f";
+export const ACCESS_CODE_HASH = "158a323a7ba44870f23d96f1516dd70aa48e9a72db4ebb026b0a89e212a208ab";
 // 관리자: 이름 + 각자의 관리자 코드 → 전체열람 권한
 export const ADMIN_CODE_HASHES = {
-  "박찬영": "532d5c0b8b8c60cd629bf120a48a988d24fd5cd8689a510ed31de1502c4d4cc7",
-  "이해원": "c71437cda5b2d35de08c8a6537c290b6ed3c826cf29f4f73edb9527b0841a9dd",
+  "박찬영": "1cea97c28cd639e0f3307fdb53660175e9e838ff799211075128e63060eb93eb",
+  "이해원": "32625be384ed05129315617a65f0b070e7b35a4257bdd11e0d98185c6f0cecfe",
 };
 
 // hue = 각 카테고리의 네온 컬러(플래그/링). 네온 스펙트럼에 고르게 분포
