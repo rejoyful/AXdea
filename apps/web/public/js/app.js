@@ -10,6 +10,7 @@ const catOf = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[CATEG
 const avatarUrl = (style, seed) => `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
 const isRejected = (idea) => !!idea && idea.status === "rejected";
 const isSelected = (idea) => !!idea && idea.status === "selected";
+const isPicked = (idea) => !!idea && (idea.pick === 1 || idea.pick === "1" || idea.pick === true);
 
 // ---------- 상태 ----------
 const state = {
@@ -154,6 +155,19 @@ async function updateIdea(id, fields) {
 async function setStatus(id, status) {
   if (DEMO) { const it = demoIdeas.find((i) => i.id === id); if (it) it.status = status; return true; }
   try { await api.updateIdea(id, { status }); return true; } catch (e) { console.error(e); alert("상태 변경 실패: " + e.message); return false; }
+}
+async function setPick(id, pick) {
+  if (DEMO) { const it = demoIdeas.find((i) => i.id === id); if (it) it.pick = pick; return true; }
+  try { await api.updateIdea(id, { pick }); return true; } catch (e) { console.error(e); alert("Pick 변경 실패: " + e.message); return false; }
+}
+async function togglePick(id) {
+  const idea = state.ideas.find((i) => i.id === id);
+  if (!idea) return;
+  const next = isPicked(idea) ? 0 : 1;
+  if (!(await setPick(id, next))) return;
+  idea.pick = next;
+  applyRejected(id);   // 메달 갱신
+  renderSocial(id);    // 버튼 상태 갱신
 }
 
 function seedDemo() {
@@ -312,9 +326,10 @@ function applyRejected(id) {
   const b = state.bodies.get(id);
   if (!b) return;
   const idea = state.ideas.find((i) => i.id === id);
-  const rj = isRejected(idea), sel = isSelected(idea);
+  const rj = isRejected(idea), sel = isSelected(idea), pk = isPicked(idea);
   b.el.classList.toggle("rejected", rj);
   b.el.classList.toggle("selected", sel);
+  b.el.classList.toggle("picked", pk);
   let stamp = b.el.querySelector(".char-stamp");
   if (rj) {
     if (!stamp) { stamp = document.createElement("div"); stamp.className = "char-stamp"; stamp.textContent = "반려"; b.el.appendChild(stamp); }
@@ -323,6 +338,11 @@ function applyRejected(id) {
   if (sel) {
     if (!sbadge) { sbadge = document.createElement("div"); sbadge.className = "char-selected"; sbadge.innerHTML = `${icon("star-fill", 11)}선정`; b.el.appendChild(sbadge); }
   } else if (sbadge) { sbadge.remove(); }
+  // 팀장 Pick 메달 (좌상단, 반짝임)
+  let medal = b.el.querySelector(".char-medal");
+  if (pk) {
+    if (!medal) { medal = document.createElement("div"); medal.className = "char-medal"; medal.title = "팀장 Pick"; medal.innerHTML = `<span class="cm-shine"></span>${icon("crown", 15)}`; b.el.appendChild(medal); }
+  } else if (medal) { medal.remove(); }
 }
 // 수정 후 캐릭터 외형(색상/카테고리) 갱신 (아바타는 유지)
 function updateCharVisual(id) {
@@ -373,12 +393,15 @@ function bumpBtn(elId) {
 function renderSocial(id) {
   const box = document.getElementById("card-social");
   if (!box) return;
-  const liked = state.myLikes.has(id);
+  const idea = state.ideas.find((i) => i.id === id);
+  const liked = state.myLikes.has(id), picked = isPicked(idea);
   const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
   box.innerHTML =
     `<button class="like-btn${liked ? " on" : ""}" id="like-btn" title="좋아요">${icon(liked ? "heart-fill" : "heart", 17)}<b>${l}</b> 좋아요</button>` +
+    (state.reveal ? `<button class="pick-btn${picked ? " on" : ""}" id="pick-btn" title="팀장 Pick — 메달 부여">${icon("crown", 17)} 팀장 Pick</button>` : "") +
     `<span class="cmt-count" aria-label="댓글 ${c}개">${icon("chat-circle", 17)}<b>${c}</b> 댓글</span>`;
   document.getElementById("like-btn").onclick = () => toggleLike(id);
+  if (state.reveal) document.getElementById("pick-btn").onclick = () => { togglePick(id); bumpBtn("pick-btn"); };
 }
 // 좋아요: 1인 1회 토글 — 누르면 반응, 다시 누르면 취소.
 async function toggleLike(id) {
@@ -1112,7 +1135,7 @@ function openList() {
     const box = $("#list-items");
     box.innerHTML = items.length
       ? items.map((i) => {
-          const cat = catOf(i.category), rj = isRejected(i), sel = isSelected(i), mine = !!state.me && i.author === state.me;
+          const cat = catOf(i.category), rj = isRejected(i), sel = isSelected(i), pk = isPicked(i), mine = !!state.me && i.author === state.me;
           const l = L(i), f = F(i), p = P(i), n = N(i), c = C(i);
           const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
           const counts =
@@ -1121,12 +1144,20 @@ function openList() {
             `<span class="lc-pos" title="해보자">${icon("thumbs-up-fill", 13)}${p}</span>` +
             `<span class="lc-neg" title="아쉬워">${icon("thumbs-down-fill", 13)}${n}</span>` +
             `<span class="lc-cmt" title="댓글">${icon("chat-circle", 13)}${c}</span>`;
-          return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}" data-id="${i.id}">
-            <span class="li-dot" style="background:${i.color}"></span>
-            <span class="li-title">${esc(i.title)}${mine ? ` <span class="li-mine">내 글</span>` : ""}${sel ? ` <span class="li-sel">${icon("star-fill", 11)}선정</span>` : ""}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
-            <span class="li-counts">${counts}</span>
-            <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
-            ${author}
+          const badges =
+            (pk ? `<span class="li-pick" title="팀장 Pick">${icon("crown", 12)}</span>` : "") +
+            (sel ? `<span class="li-sel">${icon("star-fill", 11)}선정</span>` : "") +
+            (rj ? `<span class="li-rej">반려</span>` : "") +
+            (mine ? `<span class="li-mine">내 글</span>` : "");
+          return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}${pk ? " picked" : ""}" data-id="${i.id}">
+            <div class="lci-head">
+              <span class="li-dot" style="background:${i.color}"></span>
+              <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
+              ${badges ? `<span class="lci-badges">${badges}</span>` : ""}
+            </div>
+            <div class="li-title">${esc(i.title)}</div>
+            <div class="li-counts">${counts}</div>
+            <div class="lci-foot">${author}</div>
           </button>`;
         }).join("")
       : `<div class="comment-empty">아직 아이디어가 없어요.</div>`;

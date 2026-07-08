@@ -5,6 +5,7 @@ create table if not exists ideas (
   avatar_style varchar(64), avatar_seed varchar(255), author varchar(255) not null,
   created_at datetime(6), round varchar(255) default 'lab-day', status varchar(32) default 'open',
   source_id char(36) null, -- 선정→복제 시 원본 아이디어 id
+  pick tinyint not null default 0, -- 팀장 Pick(메달)
   key idx_ideas_source (source_id)
 ) engine=InnoDB default charset=utf8mb4;
 create table if not exists comments (

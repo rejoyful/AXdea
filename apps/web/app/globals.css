@@ -772,7 +772,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 }
 
 /* ===== 전체 목록 ===== */
-.list-card { max-width: 920px; }
+.list-card { max-width: min(1280px, 94vw); }
 .list-count { color: var(--text-3); font-weight: 500; font-size: 15px; }
 /* 정렬 바 */
 .list-sort { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 14px 0 4px; }
@@ -784,22 +784,34 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 }
 .ls-btn:hover { border-color: var(--border-strong); color: var(--text); }
 .ls-btn.on { color: #05121a; background: var(--accent); border-color: transparent; box-shadow: 0 0 12px var(--accent-weak); }
-.list-items { max-height: 64vh; overflow-y: auto; overflow-x: hidden; margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
-.list-item {
-  display: flex; align-items: flex-start; gap: 11px; width: 100%; text-align: left;
-  font-family: var(--font); background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 12px 14px; cursor: pointer; transition: border-color 0.12s;
+/* 카드형 그리드 — 한 줄 5개 */
+.list-items {
+  max-height: 68vh; overflow-y: auto; overflow-x: hidden; margin-top: 12px; padding: 2px;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch;
 }
-.list-item:hover { border-color: var(--border-strong); }
+.list-item {
+  display: flex; flex-direction: column; gap: 9px; width: 100%; height: 100%; text-align: left;
+  font-family: var(--font); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 15px; cursor: pointer; transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+}
+.list-item:hover { border-color: var(--border-strong); transform: translateY(-2px); box-shadow: var(--shadow-md); }
 .list-item.rej { opacity: 0.6; }
 .list-item.mine { border-color: var(--accent); background: var(--accent-weak); }
-.li-mine { font-size: 11px; color: #fff; background: var(--accent); border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
-.li-dot { width: 13px; height: 13px; border-radius: 50%; flex: 0 0 auto; margin-top: 3px; border: 1px solid rgba(0,0,0,0.08); }
-/* 엘립시스 없이 전체 제목 줄바꿈 표시 */
-.li-title { flex: 1 1 auto; min-width: 0; font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.45; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
-.li-title .li-rej { font-size: 11px; color: #fff; background: rgba(70,70,80,0.9); border-radius: 4px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
-.li-counts { flex: 0 0 auto; display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 4px 8px; margin-top: 1px; font-size: 12.5px; font-weight: 800; color: var(--text-3); }
+.list-item.picked { border-color: color-mix(in srgb, var(--gold) 55%, var(--border)); }
+
+.lci-head { display: flex; align-items: center; gap: 7px; }
+.li-dot { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(0,0,0,0.1); }
+.lci-badges { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; flex: 0 0 auto; }
+.li-pick { display: inline-flex; align-items: center; color: var(--gold); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gold) 55%, transparent)); }
+.li-pick svg { display: block; }
+.li-mine { font-size: 11px; font-weight: 800; color: #fff; background: var(--accent); border-radius: 5px; padding: 1px 5px; }
+.li-rej { font-size: 11px; font-weight: 800; color: #fff; background: rgba(70,70,80,0.9); border-radius: 5px; padding: 1px 5px; }
+
+/* 제목: 전체 표시(줄바꿈, 잘림 없음) */
+.li-title { font-size: 14.5px; font-weight: 700; color: var(--text); line-height: 1.42; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+
+.li-counts { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 9px; font-size: 12.5px; font-weight: 800; color: var(--text-3); }
 .li-counts svg { display: block; }
 .li-counts > span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
 .li-counts .lc-like { color: var(--neon-pink); }
@@ -807,10 +819,15 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .li-counts .lc-pos { color: var(--neon-lime); }
 .li-counts .lc-neg { color: var(--neon-magenta); }
 .li-counts .lc-cmt { color: var(--text-3); }
-.li-cat { flex: 0 0 auto; margin-top: 1px; font-size: 12px; font-weight: 800; color: #05070f; background: hsl(var(--cat-hue, 190) 95% 62%); border-radius: 999px; padding: 2px 10px; box-shadow: 0 0 8px hsl(var(--cat-hue, 190) 95% 60% / 0.45); }
-.li-author { flex: 0 0 auto; min-width: 56px; margin-top: 2px; text-align: right; font-size: 13px; font-weight: 700; color: var(--accent); }
+.li-cat { flex: 0 0 auto; font-size: 11.5px; font-weight: 800; color: #05070f; background: hsl(var(--cat-hue, 190) 95% 62%); border-radius: 999px; padding: 2px 10px; box-shadow: 0 0 8px hsl(var(--cat-hue, 190) 95% 60% / 0.45); }
+.lci-foot { margin-top: auto; padding-top: 2px; }
+.li-author { font-size: 12.5px; font-weight: 700; color: var(--accent); }
 .li-author.muted { color: var(--text-3); font-weight: 500; }
-@media (max-width: 520px) { .li-cat, .li-author { display: none; } }
+
+@media (max-width: 1120px) { .list-items { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 880px)  { .list-items { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px)  { .list-items { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 430px)  { .list-items { grid-template-columns: 1fr; } }
 
 /* ===== 상단 중앙 LED 전광판 ===== */
 .marquee {
@@ -914,6 +931,45 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 }
 .char-selected svg { display: block; }
 [data-theme="light"] .char-selected { box-shadow: var(--shadow-sm); }
+
+/* ===== 팀장 Pick (반짝이는 메달, 오브제 좌상단) ===== */
+.char-medal {
+  position: absolute; top: -13px; left: -13px; z-index: 4;
+  width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; overflow: hidden;
+  color: #6a4600;
+  background: radial-gradient(circle at 35% 28%, #fff2bf, #ffcf4a 46%, #e09a1c 100%);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--gold) 70%, transparent), 0 2px 4px rgba(0, 0, 0, 0.45);
+  animation: medalpulse 2.2s ease-in-out infinite;
+}
+.char-medal svg { width: 15px; height: 15px; display: block; position: relative; z-index: 1; }
+.char-medal .cm-shine {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(115deg, transparent 34%, rgba(255, 255, 255, 0.9) 50%, transparent 66%);
+  transform: translateX(-130%);
+  animation: medalshine 2.8s ease-in-out infinite;
+}
+@keyframes medalshine { 0%, 55% { transform: translateX(-130%); } 100% { transform: translateX(130%); } }
+@keyframes medalpulse {
+  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--gold) 55%, transparent), 0 2px 4px rgba(0, 0, 0, 0.45); }
+  50% { box-shadow: 0 0 17px color-mix(in srgb, var(--gold) 90%, transparent), 0 2px 4px rgba(0, 0, 0, 0.45); }
+}
+[data-theme="light"] .char-medal { animation: none; box-shadow: 0 0 6px color-mix(in srgb, var(--gold) 45%, transparent), var(--shadow-sm); }
+@media (prefers-reduced-motion: reduce) { .char-medal, .char-medal .cm-shine { animation: none; } }
+
+/* 팀장 Pick 버튼 (좋아요 우측, 관리자 전용) */
+.pick-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+  padding: 8px 15px; cursor: pointer; transition: all 0.14s;
+}
+.pick-btn svg { display: block; }
+.pick-btn:hover { border-color: var(--border-strong); }
+.pick-btn.on { color: #4a2f00; background: var(--gold); border-color: transparent; box-shadow: 0 0 14px color-mix(in srgb, var(--gold) 45%, transparent); }
+.pick-btn.bump { animation: reactbump 0.32s ease; }
+[data-theme="light"] .pick-btn.on { box-shadow: none; }
 
 .card-sel-banner {
   display: flex; align-items: center; gap: 7px;

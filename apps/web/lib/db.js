@@ -70,6 +70,10 @@ export async function ensureSchema() {
     await q("alter table ideas add column source_id char(36) null after status");
     try { await q("alter table ideas add index idx_ideas_source (source_id)"); } catch (e) {}
   }
+  // ideas: 팀장 Pick(메달) 여부
+  if (!ihas.has("pick")) {
+    await q("alter table ideas add column pick tinyint not null default 0 after status");
+  }
   g.__axdeaSchemaReady = true;
 }
 export const json = (data, status) => Response.json(data, status ? { status } : undefined);

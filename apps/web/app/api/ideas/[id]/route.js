@@ -1,6 +1,6 @@
 import { q, json, handler } from "@/lib/db";
 export const dynamic = "force-dynamic";
-const ALLOW = ["title", "body", "category", "color", "author", "round", "status"];
+const ALLOW = ["title", "body", "category", "color", "author", "round", "status", "pick"];
 export const PATCH = handler(async (req, { params }) => {
   const b = await req.json();
   const cols = Object.keys(b).filter((k) => ALLOW.includes(k));
