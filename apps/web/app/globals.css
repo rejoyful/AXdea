@@ -223,6 +223,9 @@ html, body {
 .nb-ico { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; }
 .nb-ico svg { display: block; }
 #theme-btn { min-width: 34px; }
+/* 새 라운드 시작 — 헤더 우측 CTA(accent 아웃라인) */
+.newround-btn { color: var(--accent); border-color: var(--accent); }
+.newround-btn:hover { color: var(--accent); background: var(--accent-weak); box-shadow: 0 0 10px var(--accent-weak); }
 
 /* ===== 캔버스 ===== */
 .stage {
@@ -792,10 +795,10 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 /* 카드형 그리드 — 한 줄 5개 */
 .list-items {
   max-height: 68vh; overflow-y: auto; overflow-x: hidden; margin-top: 12px; padding: 2px;
-  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; align-items: stretch;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 184px; gap: 12px; align-items: stretch;
 }
 .list-item {
-  display: flex; flex-direction: column; gap: 9px; width: 100%; height: 100%; text-align: left;
+  display: flex; flex-direction: column; gap: 9px; width: 100%; height: 100%; text-align: left; overflow: hidden;
   font-family: var(--font); background: var(--surface-2);
   border: 1px solid var(--border); border-radius: 14px;
   padding: 14px 15px; cursor: pointer; transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
@@ -806,15 +809,14 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .list-item.picked { border-color: color-mix(in srgb, var(--gold) 55%, var(--border)); }
 
 .lci-head { display: flex; align-items: center; gap: 7px; }
-.li-dot { width: 11px; height: 11px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(0,0,0,0.1); }
 .lci-badges { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; flex: 0 0 auto; }
 .li-pick { display: inline-flex; align-items: center; color: var(--gold); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--gold) 55%, transparent)); }
 .li-pick svg { display: block; }
 .li-mine { font-size: 11px; font-weight: 800; color: #fff; background: var(--accent); border-radius: 5px; padding: 1px 5px; }
 .li-rej { font-size: 11px; font-weight: 800; color: #fff; background: rgba(70,70,80,0.9); border-radius: 5px; padding: 1px 5px; }
 
-/* 제목: 전체 표시(줄바꿈, 잘림 없음) */
-.li-title { font-size: 14.5px; font-weight: 700; color: var(--text); line-height: 1.42; white-space: normal; overflow-wrap: anywhere; word-break: break-word; }
+/* 제목: 카드 크기 균일을 위해 2줄까지(넘치면 …) */
+.li-title { font-size: 14.5px; font-weight: 700; color: var(--text); line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
 .li-counts { display: flex; align-items: center; flex-wrap: wrap; gap: 5px 9px; font-size: 12.5px; font-weight: 800; color: var(--text-3); }
 .li-counts svg { display: block; }
@@ -824,7 +826,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .li-counts .lc-pos { color: var(--neon-lime); }
 .li-counts .lc-neg { color: var(--neon-magenta); }
 .li-counts .lc-cmt { color: var(--text-3); }
-.li-cat { flex: 0 0 auto; font-size: 11.5px; font-weight: 800; color: #05070f; background: hsl(var(--cat-hue, 190) 95% 62%); border-radius: 999px; padding: 2px 10px; box-shadow: 0 0 8px hsl(var(--cat-hue, 190) 95% 60% / 0.45); }
+.li-cat { flex: 0 0 auto; font-size: 11.5px; font-weight: 800; color: #05070f; background: hsl(var(--cat-hue, 190) 95% 62%); border-radius: 999px; padding: 2px 10px; }
 .lci-foot { margin-top: auto; padding-top: 2px; }
 .li-author { font-size: 12.5px; font-weight: 700; color: var(--text-2); }
 .li-author.muted { color: var(--text-3); font-weight: 500; }

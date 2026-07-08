@@ -1,5 +1,5 @@
 // ===== AXdea — 앱 로직 =====
-import { CATEGORIES, COLORS, PANEL_COLORS, ACCESS_CODE_HASH, ADMIN_CODE_HASHES } from "./config.js";
+import { CATEGORIES, COLORS, PANEL_COLORS, ACCESS_CODE_HASH, ADMIN_CODE_HASHES, TEAM_LEAD_NAME } from "./config.js";
 import { api } from "./api.js";
 import { icon } from "./icons.js";
 import { isRevealer, sha256HexSync, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "./pure.js";
@@ -194,6 +194,8 @@ function renderMe() {
   const chip = $("#me-chip");
   chip.textContent = state.me ? (state.reveal ? `${state.me} · 전체열람` : state.me) : "이름 설정";
   chip.classList.toggle("reveal", state.reveal);
+  const nr = $("#new-round-btn");
+  if (nr) nr.hidden = !(state.reveal && state.roundsEnabled); // 관리자 + 라운드 기능 있을 때만
 }
 // 정적 버튼들에 Phosphor 아이콘 주입 (플랫폼 전체 아이콘 통일)
 function setupIcons() {
@@ -201,6 +203,7 @@ function setupIcons() {
   set("#archive-btn .nb-ico", "archive", 18);
   set("#split-btn .nb-ico", "columns", 18);
   set("#list-btn .nb-ico", "list", 18);
+  set("#new-round-btn .nb-ico", "plus", 18);
   const fab = $("#fab"); if (fab) fab.innerHTML = icon("plus", 28);
   ["#card-close", "#list-close", "#archive-close", "#split-close", "#promote-close"].forEach((s) => set(s, "x", 20));
   const mqr = $("#mq-return"); if (mqr) mqr.innerHTML = `${icon("arrow-left", 15)}<span>현재 라운드로</span>`;
@@ -396,13 +399,14 @@ function renderSocial(id) {
   if (!box) return;
   const idea = state.ideas.find((i) => i.id === id);
   const liked = state.myLikes.has(id), picked = isPicked(idea);
+  const isLead = state.me === TEAM_LEAD_NAME; // 팀장 Pick은 팀장 본인만
   const l = state.likeCounts[id] || 0, c = state.commentCounts[id] || 0;
   box.innerHTML =
     `<button class="like-btn${liked ? " on" : ""}" id="like-btn" title="좋아요">${icon(liked ? "heart-fill" : "heart", 17)}<b>${l}</b> 좋아요</button>` +
-    (state.reveal ? `<button class="pick-btn${picked ? " on" : ""}" id="pick-btn" title="팀장 Pick — 메달 부여">${icon("crown", 17)} 팀장 Pick</button>` : "") +
+    (isLead ? `<button class="pick-btn${picked ? " on" : ""}" id="pick-btn" title="팀장 Pick — 메달 부여">${icon("crown", 17)} 팀장 Pick</button>` : "") +
     `<span class="cmt-count" aria-label="댓글 ${c}개">${icon("chat-circle", 17)}<b>${c}</b> 댓글</span>`;
   document.getElementById("like-btn").onclick = () => toggleLike(id);
-  if (state.reveal) document.getElementById("pick-btn").onclick = () => { togglePick(id); bumpBtn("pick-btn"); };
+  if (isLead) document.getElementById("pick-btn").onclick = () => { togglePick(id); bumpBtn("pick-btn"); };
 }
 // 좋아요: 1인 1회 토글 — 누르면 반응, 다시 누르면 취소.
 async function toggleLike(id) {
@@ -1153,7 +1157,6 @@ function openList() {
             (rj ? `<span class="li-rej">반려</span>` : "");
           return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}${pk ? " picked" : ""}" data-id="${i.id}">
             <div class="lci-head">
-              <span class="li-dot" style="background:${i.color}"></span>
               <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
               ${badges ? `<span class="lci-badges">${badges}</span>` : ""}
             </div>
@@ -1173,7 +1176,8 @@ function openList() {
 
 // ---------- 라운드 / 아카이브 ----------
 function updateRoundUI() {
-  const marquee = $("#marquee"), archiveBtn = $("#archive-btn");
+  const marquee = $("#marquee"), archiveBtn = $("#archive-btn"), newRoundBtn = $("#new-round-btn");
+  if (newRoundBtn) newRoundBtn.hidden = !(state.reveal && state.roundsEnabled);
   if (!state.roundsEnabled) { marquee.hidden = true; archiveBtn.hidden = true; return; }
   archiveBtn.hidden = false;
   marquee.hidden = false;
@@ -1227,10 +1231,10 @@ async function openArchive() {
   box.querySelectorAll(".round-edit").forEach((btn) => {
     btn.onclick = (e) => { e.stopPropagation(); renameRound(btn.dataset.rename); };
   });
+  // '새 라운드 시작'은 상단 헤더 버튼으로 이동 — 모달 하단은 관리자에게만 안내
   $("#archive-actions").innerHTML = state.reveal
-    ? `<button class="btn primary" id="new-round-btn">＋ 새 라운드 시작 (현재 라운드는 아카이브로 보관)</button>`
-    : `<p class="fineprint" style="margin:0">새 라운드 시작은 <b>박찬영 부장</b>만 할 수 있어요.</p>`;
-  if (state.reveal) $("#new-round-btn").onclick = startNewRound;
+    ? `<p class="fineprint" style="margin:0">새 라운드는 우측 상단 <b>＋ 새 라운드</b> 버튼으로 시작해요.</p>`
+    : "";
   $("#archive-modal").hidden = false;
 }
 async function selectRound(name) {
@@ -1298,6 +1302,7 @@ $("#card-close").onclick = () => { $("#card-modal").hidden = true; state.openId 
 $("#c-cancel").onclick = () => { state.editId = null; $("#compose-modal").hidden = true; };
 $("#c-save").onclick = saveIdea;
 $("#archive-btn").onclick = openArchive;
+$("#new-round-btn").onclick = startNewRound;
 $("#mq-board").onclick = openArchive;
 $("#archive-close").onclick = () => { $("#archive-modal").hidden = true; };
 $("#mq-return").onclick = returnToActive;

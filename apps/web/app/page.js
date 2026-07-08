@@ -16,6 +16,7 @@ const MARKUP = `
       <div class="actions-side">
         <button class="navbtn" id="theme-btn" title="테마 전환" aria-label="테마"><span class="nb-ico"></span><span class="nb-label">테마</span></button>
         <span class="me" id="me-chip" title="이름 변경"></span>
+        <button class="navbtn newround-btn" id="new-round-btn" title="현재 라운드를 아카이브로 보관하고 새 라운드 시작" hidden><span class="nb-ico"></span><span class="nb-label">새 라운드</span></button>
       </div>
     </div>
   </header>
