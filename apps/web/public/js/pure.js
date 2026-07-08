@@ -1,9 +1,10 @@
 // 순수 로직 (부작용 없음) — node로 검증 가능, 브라우저에서도 그대로 import
-import { REVEAL_NAME, AVATAR_STYLES } from "./config.js";
+import { REVEAL_NAMES, AVATAR_STYLES } from "./config.js";
 
-// 전체 열람 판정: 트림 후 정확히 일치할 때만
+// 관리자 판정: 트림 후 관리자 목록과 정확히 일치할 때만
 export function isRevealer(name) {
-  return (name || "").trim() === REVEAL_NAME;
+  const n = (name || "").trim();
+  return REVEAL_NAMES.some((r) => r === n);
 }
 
 // 문자열 seed → 안정적 32bit 해시 (FNV-1a)

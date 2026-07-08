@@ -3,8 +3,8 @@
 //    (앱을 다른 곳에서 열어 API가 없으면 자동으로 로컬 데모 모드로 동작)
 export const API_BASE = "/api";
 
-// 전체 열람 권한을 가진 이름 (정확히 일치할 때만 작성자 공개)
-export const REVEAL_NAME = "박찬영";
+// 관리자(전체 열람 권한) 이름 목록 — 정확히 일치할 때만 작성자 공개/관리 기능 노출
+export const REVEAL_NAMES = ["박찬영", "이해원"];
 
 // hue = 각 카테고리의 네온 컬러(플래그/링). 네온 스펙트럼에 고르게 분포
 export const CATEGORIES = [

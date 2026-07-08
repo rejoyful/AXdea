@@ -1,10 +1,13 @@
 import assert from "node:assert";
 import { isRevealer, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "../public/js/pure.js";
 
-// 열람 판정
+// 관리자(열람) 판정 — 박찬영 · 이해원
 assert.equal(isRevealer("박찬영"), true);
 assert.equal(isRevealer(" 박찬영 "), true);
+assert.equal(isRevealer("이해원"), true);
+assert.equal(isRevealer(" 이해원 "), true);
 assert.equal(isRevealer("박찬영님"), false);
+assert.equal(isRevealer("이해원2"), false);
 assert.equal(isRevealer("홍길동"), false);
 assert.equal(isRevealer(""), false);
 
