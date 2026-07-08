@@ -967,11 +967,21 @@ function startSync() {
 }
 
 // ---------- 부팅 ----------
+// 데모(오프라인) 모드일 때 실제 데이터로 오해하지 않도록 큰 경고 배너
+function showDemoBanner() {
+  if (document.getElementById("demo-banner")) return;
+  const b = document.createElement("div");
+  b.id = "demo-banner";
+  b.className = "demo-banner";
+  b.innerHTML = '⚠️ <b>데모(오프라인) 모드</b> — 서버에 연결되지 않아 아래는 <b>가짜 예시</b>입니다. 실제 데이터 아님 · 변경은 저장 안 됨. &nbsp; 올바른 주소 → <b>axdea.hakjisa.kr</b>';
+  document.body.appendChild(b);
+}
 async function boot() {
   initTheme();
   renderFilters();
   renderMe();
   state.roundsEnabled = await detectRounds();
+  if (DEMO) showDemoBanner();
   if (state.roundsEnabled) {
     state.activeRound = await loadActiveRound();
     state.viewRound = state.activeRound;
