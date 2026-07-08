@@ -33,4 +33,5 @@ export const COLORS = ["#22e3ff", "#5bff9d", "#ffe45e", "#ff9d3d", "#ff3d9a", "#
 // 분할 비교 패널별 네온 LED 색상 (라운드마다 다른 색으로 구분)
 export const PANEL_COLORS = ["#4dff92", "#22e3ff", "#ff5db1", "#ffd24d"]; // 그린·시안·핑크·옐로우
 
-export const AVATAR_STYLES = ["fun-emoji", "bottts", "adventurer", "thumbs", "open-peeps", "big-smile", "lorelei", "notionists"];
+// 원을 잘 채우는 스타일만 (thumbs·open-peeps 등 여백 많은 건 제외)
+export const AVATAR_STYLES = ["fun-emoji", "bottts", "adventurer", "big-smile", "lorelei", "notionists", "micah", "personas"];

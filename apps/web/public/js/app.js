@@ -7,7 +7,8 @@ import { isRevealer, sha256HexSync, pickAvatar, stepBody, resolveWall, resolveWa
 const $ = (s) => document.querySelector(s);
 const TOP_INSET = 92; // 전광판 아래로만 아이디어가 돌아다니도록 상단 여백(스테이지 기준)
 const catOf = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
-const avatarUrl = (style, seed) => `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+// scale로 인물이 원 안을 꽉 채우게(비어보이는 아바타 개선)
+const avatarUrl = (style, seed) => `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}&scale=115`;
 const isRejected = (idea) => !!idea && idea.status === "rejected";
 const isSelected = (idea) => !!idea && idea.status === "selected";
 const isPicked = (idea) => !!idea && (idea.pick === 1 || idea.pick === "1" || idea.pick === true);
@@ -413,26 +414,28 @@ async function toggleLike(id) {
   else { state.myLikes.add(id); state.likeCounts[id] = (state.likeCounts[id] || 0) + 1; }
   updateCharCounts(id); renderSocial(id); bumpBtn("like-btn");
 }
-// 내가 쓴 아이디어를 외관으로 표시 (강조 링 + '내 글' 태그) — 내 화면에만 보임
+// 본인 글 표시: '내 글' 태그 제거(이름 깜빡으로 대체). mine 클래스만 유지
 function applyMine(id) {
   const b = state.bodies.get(id);
   const idea = state.ideas.find((i) => i.id === id);
   if (!b || !idea) return;
   const mine = !!state.me && idea.author === state.me;
   b.el.classList.toggle("mine", mine);
-  let tag = b.el.querySelector(".char-mine");
-  if (mine) {
-    if (!tag) { tag = document.createElement("div"); tag.className = "char-mine"; tag.textContent = "내 글"; b.el.appendChild(tag); }
-  } else if (tag) { tag.remove(); }
+  const tag = b.el.querySelector(".char-mine");
+  if (tag) tag.remove(); // '내 글' 표현 제거 — 본인 글은 이름이 잔잔히 깜빡여 구분
 }
 function rerenderMine() { state.bodies.forEach((_, id) => applyMine(id)); }
 function rerenderAuthors() {
   state.bodies.forEach((b, id) => {
     const idea = state.ideas.find((i) => i.id === id);
+    const mine = !!state.me && idea && idea.author === state.me;
+    // 관리자(전체열람)는 모든 이름, 그 외엔 본인 글 이름만 표시
+    const show = idea && (state.reveal || mine);
     let tag = b.el.querySelector(".char-author");
-    if (state.reveal && idea) {
+    if (show) {
       if (!tag) { tag = document.createElement("div"); tag.className = "char-author"; b.el.appendChild(tag); }
       tag.textContent = idea.author;
+      tag.classList.toggle("self", mine); // 본인 글이면 이름이 잔잔히 깜빡
     } else if (tag) { tag.remove(); }
   });
 }
@@ -1137,7 +1140,7 @@ function openList() {
       ? items.map((i) => {
           const cat = catOf(i.category), rj = isRejected(i), sel = isSelected(i), pk = isPicked(i), mine = !!state.me && i.author === state.me;
           const l = L(i), f = F(i), p = P(i), n = N(i), c = C(i);
-          const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
+          const author = (state.reveal || mine) ? `<span class="li-author${mine ? " self" : ""}">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
           const counts =
             `<span class="lc-like" title="좋아요">${icon("heart-fill", 13)}${l}</span>` +
             `<span class="lc-coffee" title="커피">${icon("coffee-fill", 13)}${f}</span>` +
@@ -1147,8 +1150,7 @@ function openList() {
           const badges =
             (pk ? `<span class="li-pick" title="팀장 Pick">${icon("crown", 12)}</span>` : "") +
             (sel ? `<span class="li-sel">${icon("star-fill", 11)}선정</span>` : "") +
-            (rj ? `<span class="li-rej">반려</span>` : "") +
-            (mine ? `<span class="li-mine">내 글</span>` : "");
+            (rj ? `<span class="li-rej">반려</span>` : "");
           return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}${pk ? " picked" : ""}" data-id="${i.id}">
             <div class="lci-head">
               <span class="li-dot" style="background:${i.color}"></span>
