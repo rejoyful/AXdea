@@ -1,15 +1,18 @@
 import { q, json, handler, ensureSchema } from "@/lib/db";
 export const dynamic = "force-dynamic";
-// 반응 추가(누적): 좋아요/커피를 누를 때마다 한 행씩 쌓인다.
+// 반응 추가(1인 1회): 같은 사람이 여러 번 눌러도 한 번만 반영(유니크 키).
 export const POST = handler(async (req) => {
   await ensureSchema();
   const b = await req.json();
   if (!b.idea_id || !b.voter) return json({ error: "idea_id/voter required" }, 400);
   const kind = b.kind === "coffee" ? "coffee" : "like";
-  await q("insert into likes (idea_id,voter,kind,created_at) values (?,?,?,UTC_TIMESTAMP(6))", [b.idea_id, b.voter, kind]);
+  await q(
+    "insert into likes (idea_id,voter,kind,created_at) values (?,?,?,UTC_TIMESTAMP(6)) on duplicate key update created_at=created_at",
+    [b.idea_id, b.voter, kind]
+  );
   return json({ ok: true });
 });
-// (호환용) 특정 사용자의 반응 전체 제거
+// 반응 취소: 해당 사용자의 그 반응 제거
 export const DELETE = handler(async (req) => {
   await ensureSchema();
   const sp = new URL(req.url).searchParams;

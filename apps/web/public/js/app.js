@@ -132,6 +132,14 @@ async function coffeeIdea(id) {
   if (DEMO) { demoLikes.push({ idea_id: id, voter: state.me, kind: "coffee" }); return true; }
   try { await api.coffee(id, state.me); return true; } catch (e) { console.error(e); alert("커피 전송 실패: " + e.message); return false; }
 }
+async function unlikeIdea(id) {
+  if (DEMO) { demoLikes = demoLikes.filter((l) => !(l.idea_id === id && l.voter === state.me && l.kind !== "coffee")); return true; }
+  try { await api.unlike(id, state.me); return true; } catch (e) { console.error(e); alert("좋아요 취소 실패: " + e.message); return false; }
+}
+async function uncoffeeIdea(id) {
+  if (DEMO) { demoLikes = demoLikes.filter((l) => !(l.idea_id === id && l.voter === state.me && l.kind === "coffee")); return true; }
+  try { await api.uncoffee(id, state.me); return true; } catch (e) { console.error(e); alert("커피 취소 실패: " + e.message); return false; }
+}
 async function addComment(ideaId, author, body, opts = {}) {
   if (DEMO) { const full = { id: uid(), created_at: new Date().toISOString(), idea_id: ideaId, author, body, parent_id: opts.parent_id || null, sentiment: opts.sentiment || null }; demoComments.push(full); return full; }
   try { return await api.addComment(ideaId, author, body, opts); } catch (e) { console.error(e); return null; }
@@ -382,22 +390,26 @@ function renderSocial(id) {
     `<button class="like-btn${liked ? " on" : ""}" id="like-btn" title="좋아요">${icon(liked ? "heart-fill" : "heart", 17)}<b>${l}</b> 좋아요</button>` +
     `<button class="coffee-btn${coffeed ? " on" : ""}" id="coffee-btn" title="커피 한잔 하자!">${icon(coffeed ? "coffee-fill" : "coffee", 17)}<b>${f}</b> 커피</button>` +
     `<span class="cmt-count">${icon("chat-circle", 16)} 댓글 ${c}</span>`;
-  document.getElementById("like-btn").onclick = () => addLike(id);
-  document.getElementById("coffee-btn").onclick = () => addCoffee(id);
+  document.getElementById("like-btn").onclick = () => toggleLike(id);
+  document.getElementById("coffee-btn").onclick = () => toggleCoffee(id);
 }
-// 좋아요/커피: 누를 때마다 누적(+1). 취소 없음.
-async function addLike(id) {
+// 좋아요/커피: 1인 1회 토글 — 누르면 반응, 다시 누르면 취소.
+async function toggleLike(id) {
   if (!state.me) { openNameModal(); return; }
-  if (!(await likeIdea(id))) return;
-  state.myLikes.add(id);
-  state.likeCounts[id] = (state.likeCounts[id] || 0) + 1;
+  const liked = state.myLikes.has(id);
+  const ok = liked ? await unlikeIdea(id) : await likeIdea(id);
+  if (!ok) return;
+  if (liked) { state.myLikes.delete(id); state.likeCounts[id] = Math.max(0, (state.likeCounts[id] || 1) - 1); }
+  else { state.myLikes.add(id); state.likeCounts[id] = (state.likeCounts[id] || 0) + 1; }
   updateCharCounts(id); renderSocial(id); bumpBtn("like-btn");
 }
-async function addCoffee(id) {
+async function toggleCoffee(id) {
   if (!state.me) { openNameModal(); return; }
-  if (!(await coffeeIdea(id))) return;
-  state.myCoffees.add(id);
-  state.coffeeCounts[id] = (state.coffeeCounts[id] || 0) + 1;
+  const coffeed = state.myCoffees.has(id);
+  const ok = coffeed ? await uncoffeeIdea(id) : await coffeeIdea(id);
+  if (!ok) return;
+  if (coffeed) { state.myCoffees.delete(id); state.coffeeCounts[id] = Math.max(0, (state.coffeeCounts[id] || 1) - 1); }
+  else { state.myCoffees.add(id); state.coffeeCounts[id] = (state.coffeeCounts[id] || 0) + 1; }
   updateCharCounts(id); renderSocial(id); bumpBtn("coffee-btn");
 }
 // 내가 쓴 아이디어를 외관으로 표시 (강조 링 + '내 글' 태그) — 내 화면에만 보임

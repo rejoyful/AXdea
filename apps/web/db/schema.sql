@@ -17,8 +17,9 @@ create table if not exists comments (
 create table if not exists likes (
   id bigint unsigned not null auto_increment primary key,
   idea_id char(36), voter varchar(255) not null,
-  kind varchar(16) not null default 'like', -- 'like' | 'coffee' (누적: 같은 사람이 여러 번 가능)
+  kind varchar(16) not null default 'like', -- 'like' | 'coffee'
   created_at datetime(6),
+  unique key uniq_like_voter (idea_id, voter, kind), -- 1인 1회(반응 종류별)
   key idx_likes_idea (idea_id), key idx_likes_idea_kind (idea_id, kind),
   constraint fk_likes_idea foreign key (idea_id) references ideas(id) on delete cascade
 ) engine=InnoDB default charset=utf8mb4;

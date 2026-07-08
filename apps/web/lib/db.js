@@ -52,6 +52,15 @@ export async function ensureSchema() {
     try { await q("alter table likes add column id bigint unsigned not null auto_increment primary key first"); } catch (e) {}
     try { await q("alter table likes add index idx_likes_idea_kind (idea_id, kind)"); } catch (e) {}
   }
+  // likes: 1인 1회로 전환 — 중복 반응 제거 후 유니크 키 추가(이미 있으면 건너뜀)
+  const luniq = await q(
+    "select 1 from information_schema.statistics where table_schema=database() and table_name='likes' and index_name='uniq_like_voter' limit 1"
+  );
+  if (!luniq.length) {
+    // 같은 (idea_id, voter, kind) 중복은 가장 오래된 것만 남기고 삭제
+    try { await q("delete l1 from likes l1 join likes l2 on l1.idea_id=l2.idea_id and l1.voter=l2.voter and l1.kind=l2.kind and l1.id>l2.id"); } catch (e) {}
+    try { await q("alter table likes add unique key uniq_like_voter (idea_id, voter, kind)"); } catch (e) {}
+  }
   // ideas: 선정→복제 출처 추적(source_id)
   const icols = await q(
     "select column_name from information_schema.columns where table_schema=database() and table_name='ideas'"
