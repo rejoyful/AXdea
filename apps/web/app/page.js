@@ -94,7 +94,7 @@ const MARKUP = `
       <form class="comment-form" id="comment-form">
         <div class="sent-pick" id="comment-sent"></div>
         <div class="comment-row">
-          <textarea id="comment-input" placeholder="댓글 남기기…" maxlength="300" rows="2" autocomplete="off"></textarea>
+          <textarea id="comment-input" placeholder="첫 댓글을 남겨보세요" maxlength="300" rows="2" autocomplete="off"></textarea>
           <button class="btn primary" type="submit">등록</button>
         </div>
       </form>

@@ -21,6 +21,8 @@ const state = {
   editId: null,       // 수정 중인 idea id (null이면 신규 작성)
   compose: { category: "etc", color: COLORS[0] },
   commentCounts: {},  // idea_id -> 댓글 수
+  posCounts: {},      // idea_id -> 해보자 댓글 수
+  negCounts: {},      // idea_id -> 아쉬워 댓글 수
   likeCounts: {},     // idea_id -> 좋아요 수(누적)
   coffeeCounts: {},   // idea_id -> 커피 수(누적)
   myLikes: new Set(), // 내가 좋아요 누른 적 있는 idea_id
@@ -102,18 +104,22 @@ async function loadComments(ideaId) {
 // 댓글 수 + 좋아요/커피 수(누적) + 내 반응 집계 (한 번에 로드)
 async function loadCounts() {
   if (DEMO) {
-    const cc = {}, lc = {}, fc = {}, mine = new Set(), mineCoffee = new Set();
-    demoComments.forEach((c) => { cc[c.idea_id] = (cc[c.idea_id] || 0) + 1; });
+    const cc = {}, pc = {}, nc = {}, lc = {}, fc = {}, mine = new Set(), mineCoffee = new Set();
+    demoComments.forEach((c) => {
+      cc[c.idea_id] = (cc[c.idea_id] || 0) + 1;
+      if (c.sentiment === "pos") pc[c.idea_id] = (pc[c.idea_id] || 0) + 1;
+      else if (c.sentiment === "neg") nc[c.idea_id] = (nc[c.idea_id] || 0) + 1;
+    });
     demoLikes.forEach((l) => {
       if (l.kind === "coffee") { fc[l.idea_id] = (fc[l.idea_id] || 0) + 1; if (l.voter === state.me) mineCoffee.add(l.idea_id); }
       else { lc[l.idea_id] = (lc[l.idea_id] || 0) + 1; if (l.voter === state.me) mine.add(l.idea_id); }
     });
-    return { cc, lc, fc, mine, mineCoffee };
+    return { cc, pc, nc, lc, fc, mine, mineCoffee };
   }
   try {
     const d = await api.counts(state.me);
-    return { cc: d.commentCounts || {}, lc: d.likeCounts || {}, fc: d.coffeeCounts || {}, mine: new Set(d.myLikes || []), mineCoffee: new Set(d.myCoffees || []) };
-  } catch (e) { console.error(e); return { cc: {}, lc: {}, fc: {}, mine: new Set(), mineCoffee: new Set() }; }
+    return { cc: d.commentCounts || {}, pc: d.posCounts || {}, nc: d.negCounts || {}, lc: d.likeCounts || {}, fc: d.coffeeCounts || {}, mine: new Set(d.myLikes || []), mineCoffee: new Set(d.myCoffees || []) };
+  } catch (e) { console.error(e); return { cc: {}, pc: {}, nc: {}, lc: {}, fc: {}, mine: new Set(), mineCoffee: new Set() }; }
 }
 // 반응 추가(누적, 취소 없음)
 async function likeIdea(id) {
@@ -307,8 +313,8 @@ function updateCharCounts(id) {
   if (cmt) { if (c > 0) { cmt.innerHTML = `${icon("chat-circle", 12)}${c}`; cmt.hidden = false; } else cmt.hidden = true; }
 }
 async function refreshCounts() {
-  const { cc, lc, fc, mine, mineCoffee } = await loadCounts();
-  state.commentCounts = cc; state.likeCounts = lc; state.coffeeCounts = fc; state.myLikes = mine; state.myCoffees = mineCoffee;
+  const { cc, pc, nc, lc, fc, mine, mineCoffee } = await loadCounts();
+  state.commentCounts = cc; state.posCounts = pc; state.negCounts = nc; state.likeCounts = lc; state.coffeeCounts = fc; state.myLikes = mine; state.myCoffees = mineCoffee;
   state.bodies.forEach((_, id) => updateCharCounts(id));
   if (state.openId) renderSocial(state.openId);
 }
@@ -659,8 +665,8 @@ async function openCard(id) {
   renderComments(await loadComments(id));
 }
 function sentimentBadge(s) {
-  if (s === "pos") return `<span class="c-sent pos">${icon("thumbs-up-fill", 13)}긍정</span>`;
-  if (s === "neg") return `<span class="c-sent neg">${icon("thumbs-down-fill", 13)}부정</span>`;
+  if (s === "pos") return `<span class="c-sent pos">${icon("thumbs-up-fill", 13)}해보자</span>`;
+  if (s === "neg") return `<span class="c-sent neg">${icon("thumbs-down-fill", 13)}아쉬워</span>`;
   return "";
 }
 function commentNode(c, isReply) {
@@ -677,7 +683,7 @@ function commentNode(c, isReply) {
 function renderComments(list) {
   const box = $("#card-comments");
   state.openComments = list;
-  if (!list.length) { box.innerHTML = `<div class="comment-empty">첫 댓글을 남겨보세요.</div>`; return; }
+  if (!list.length) { box.innerHTML = ""; return; }
   const tops = list.filter((c) => !c.parent_id);
   const byParent = {};
   list.filter((c) => c.parent_id).forEach((c) => { (byParent[c.parent_id] = byParent[c.parent_id] || []).push(c); });
@@ -695,9 +701,9 @@ function renderComments(list) {
   });
   box.scrollTop = box.scrollHeight;
 }
-// 감정 선택기(긍정/부정) — 공용
+// 감정 선택기(해보자/아쉬워) — 공용
 function sentButtonsHTML() {
-  return `<button type="button" class="sent-btn pos" data-s="pos" title="긍정">${icon("thumbs-up", 15)}<span>긍정</span></button><button type="button" class="sent-btn neg" data-s="neg" title="부정">${icon("thumbs-down", 15)}<span>부정</span></button>`;
+  return `<button type="button" class="sent-btn pos" data-s="pos" title="해보자">${icon("thumbs-up", 15)}<span>해보자</span></button><button type="button" class="sent-btn neg" data-s="neg" title="아쉬워">${icon("thumbs-down", 15)}<span>아쉬워</span></button>`;
 }
 function sentPickerHTML() { return `<div class="sent-pick">${sentButtonsHTML()}</div>`; }
 function wireSentPicker(root, onChange) {
@@ -861,12 +867,18 @@ async function saveIdea() {
 // ---------- 전체 아이디어 목록 ----------
 function openList() {
   if (!state.listSort) state.listSort = "likes"; // 기본 좋아요순
+  const L = (i) => state.likeCounts[i.id] || 0, F = (i) => state.coffeeCounts[i.id] || 0;
+  const P = (i) => state.posCounts[i.id] || 0, N = (i) => state.negCounts[i.id] || 0, C = (i) => state.commentCounts[i.id] || 0;
   const sortItems = () => {
     const items = [...state.ideas];
-    const L = (i) => state.likeCounts[i.id] || 0, C = (i) => state.commentCounts[i.id] || 0;
-    if (state.listSort === "comments") items.sort((a, b) => C(b) - C(a) || L(b) - L(a));
-    else if (state.listSort === "name") items.sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "ko"));
-    else items.sort((a, b) => L(b) - L(a) || C(b) - C(a) || new Date(b.created_at) - new Date(a.created_at));
+    const byDate = (a, b) => new Date(b.created_at) - new Date(a.created_at);
+    const s = state.listSort;
+    if (s === "coffee") items.sort((a, b) => F(b) - F(a) || L(b) - L(a) || byDate(a, b));
+    else if (s === "pos") items.sort((a, b) => P(b) - P(a) || C(b) - C(a) || byDate(a, b));
+    else if (s === "neg") items.sort((a, b) => N(b) - N(a) || C(b) - C(a) || byDate(a, b));
+    else if (s === "comments") items.sort((a, b) => C(b) - C(a) || L(b) - L(a) || byDate(a, b));
+    else if (s === "name") items.sort((a, b) => String(a.title || "").localeCompare(String(b.title || ""), "ko"));
+    else items.sort((a, b) => L(b) - L(a) || C(b) - C(a) || byDate(a, b));
     return items;
   };
   const render = () => {
@@ -875,19 +887,25 @@ function openList() {
     const sortBar = $("#list-sort");
     if (sortBar) {
       const opt = (k, label) => `<button class="ls-btn${state.listSort === k ? " on" : ""}" data-sort="${k}">${label}</button>`;
-      sortBar.innerHTML = `<span class="ls-label">정렬</span>${opt("likes", "좋아요순")}${opt("comments", "댓글순")}${opt("name", "이름순")}`;
+      sortBar.innerHTML = `<span class="ls-label">정렬</span>${opt("likes", "좋아요순")}${opt("coffee", "커피순")}${opt("pos", "해보자순")}${opt("neg", "아쉬워순")}${opt("comments", "댓글순")}${opt("name", "이름순")}`;
       sortBar.querySelectorAll(".ls-btn").forEach((b) => (b.onclick = () => { state.listSort = b.dataset.sort; render(); }));
     }
     const box = $("#list-items");
     box.innerHTML = items.length
       ? items.map((i) => {
           const cat = catOf(i.category), rj = isRejected(i), mine = !!state.me && i.author === state.me;
-          const l = state.likeCounts[i.id] || 0, f = state.coffeeCounts[i.id] || 0, c = state.commentCounts[i.id] || 0;
+          const l = L(i), f = F(i), p = P(i), n = N(i), c = C(i);
           const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
+          const counts =
+            `<span class="lc-like" title="좋아요">${icon("heart-fill", 13)}${l}</span>` +
+            `<span class="lc-coffee" title="커피">${icon("coffee-fill", 13)}${f}</span>` +
+            `<span class="lc-pos" title="해보자">${icon("thumbs-up-fill", 13)}${p}</span>` +
+            `<span class="lc-neg" title="아쉬워">${icon("thumbs-down-fill", 13)}${n}</span>` +
+            `<span class="lc-cmt" title="댓글">${icon("chat-circle", 13)}${c}</span>`;
           return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}" data-id="${i.id}">
             <span class="li-dot" style="background:${i.color}"></span>
             <span class="li-title">${esc(i.title)}${mine ? ` <span class="li-mine">내 글</span>` : ""}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
-            <span class="li-counts"><span class="lc-like">${icon("heart-fill", 13)}${l}</span>${f ? `<span class="lc-coffee">${icon("coffee-fill", 13)}${f}</span>` : ""}<span class="lc-cmt">${icon("chat-circle", 13)}${c}</span></span>
+            <span class="li-counts">${counts}</span>
             <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
             ${author}
           </button>`;
