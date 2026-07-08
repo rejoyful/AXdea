@@ -9,6 +9,7 @@ const TOP_INSET = 92; // 전광판 아래로만 아이디어가 돌아다니도�
 const catOf = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
 const avatarUrl = (style, seed) => `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
 const isRejected = (idea) => !!idea && idea.status === "rejected";
+const isSelected = (idea) => !!idea && idea.status === "selected";
 
 // ---------- 상태 ----------
 const state = {
@@ -275,12 +276,18 @@ function makeChar(idea) {
 function applyRejected(id) {
   const b = state.bodies.get(id);
   if (!b) return;
-  const rj = isRejected(state.ideas.find((i) => i.id === id));
+  const idea = state.ideas.find((i) => i.id === id);
+  const rj = isRejected(idea), sel = isSelected(idea);
   b.el.classList.toggle("rejected", rj);
+  b.el.classList.toggle("selected", sel);
   let stamp = b.el.querySelector(".char-stamp");
   if (rj) {
     if (!stamp) { stamp = document.createElement("div"); stamp.className = "char-stamp"; stamp.textContent = "반려"; b.el.appendChild(stamp); }
   } else if (stamp) { stamp.remove(); }
+  let sbadge = b.el.querySelector(".char-selected");
+  if (sel) {
+    if (!sbadge) { sbadge = document.createElement("div"); sbadge.className = "char-selected"; sbadge.innerHTML = `${icon("star-fill", 11)}선정`; b.el.appendChild(sbadge); }
+  } else if (sbadge) { sbadge.remove(); }
 }
 // 수정 후 캐릭터 외형(색상/카테고리) 갱신 (아바타는 유지)
 function updateCharVisual(id) {
@@ -640,19 +647,25 @@ async function openCard(id) {
         ${state.reveal ? `<span class="card-author-tag">✎ ${esc(idea.author)}</span>` : ""}
       </div>
     </div>`;
-  const rj = isRejected(idea);
+  const rj = isRejected(idea), sel = isSelected(idea);
   $("#card-body").innerHTML =
+    (sel ? `<div class="card-sel-banner">${icon("star-fill", 14)} 선정된 아이디어 · 실행 라운드로 복제되었습니다</div>` : "") +
+    (idea.source_id ? `<div class="card-src-banner">${icon("star", 14)} 다른 라운드에서 선정되어 복제된 아이디어예요</div>` : "") +
     (rj ? `<div class="card-rej-banner">반려됨 · 진행이 어려운 아이디어로 표시되었습니다</div>` : "") +
     `<div class="card-text">${esc(idea.body || "(내용 없음)")}</div>`;
   const isOwner = !!state.me && idea.author === state.me;
   let btns = "";
+  if (state.reveal) btns += `<button class="btn primary" id="promote-btn">${icon("star", 15)} 선정 · 라운드로 복제</button>`;
   if (!readonly()) {
+    if (state.reveal && sel) btns += `<button class="btn" id="unsel-btn">선정 해제</button>`;
     if (state.reveal) btns += `<button class="btn" id="rej-btn">${rj ? "반려 취소" : "반려"}</button>`;
     if (isOwner) btns += `<button class="btn" id="edit-btn">수정</button>`;
     if (isOwner || state.reveal) btns += `<button class="btn danger" id="del-btn">삭제</button>`;
   }
   $("#card-footer").innerHTML = btns;
+  if (state.reveal) $("#promote-btn").onclick = () => openPromote(id);
   if (!readonly()) {
+    if (state.reveal && sel) $("#unsel-btn").onclick = () => unselectIdea(id);
     if (state.reveal) $("#rej-btn").onclick = () => toggleReject(id);
     if (isOwner) $("#edit-btn").onclick = () => openEdit(id);
     if (isOwner || state.reveal) $("#del-btn").onclick = () => removeIdea(id);
@@ -787,6 +800,89 @@ async function removeIdea(id) {
   $("#card-modal").hidden = true;
   updateEmpty();
 }
+async function unselectIdea(id) {
+  const idea = state.ideas.find((i) => i.id === id);
+  if (!idea) return;
+  if (!(await setStatus(id, "open"))) return;
+  idea.status = "open";
+  applyRejected(id);
+  openCard(id);
+}
+
+// ---------- 선정 → 라운드로 복제 ----------
+async function openPromote(id) {
+  const idea = state.ideas.find((i) => i.id === id);
+  if (!idea) return;
+  state.promoteId = id;
+  state.promoteTarget = null;
+  const cat = catOf(idea.category);
+  $("#promote-idea").innerHTML =
+    `<span class="pi-dot" style="background:${idea.color}"></span>` +
+    `<span class="pi-title">${esc(idea.title)}</span>` +
+    `<span class="pi-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>`;
+  const box = $("#promote-rounds");
+  box.innerHTML = `<span class="rp-loading">라운드 불러오는 중…</span>`;
+  const rounds = await loadRounds();
+  box.innerHTML = rounds.map((r) => {
+    const cur = r.round === (idea.round || state.activeRound);
+    return `<button type="button" class="round-chip${cur ? " cur" : ""}" data-round="${esc(r.round)}">${esc(r.round)}<span class="rc-cnt">${r.count}</span>${cur ? `<span class="rc-cur">현재</span>` : ""}</button>`;
+  }).join("");
+  box.querySelectorAll(".round-chip").forEach((c) => {
+    c.onclick = () => {
+      state.promoteTarget = c.dataset.round;
+      $("#promote-new").value = "";
+      box.querySelectorAll(".round-chip").forEach((x) => x.classList.toggle("on", x === c));
+    };
+  });
+  const nu = $("#promote-new");
+  nu.value = "";
+  nu.oninput = () => { state.promoteTarget = null; box.querySelectorAll(".round-chip").forEach((x) => x.classList.remove("on")); };
+  $("#promote-apply").disabled = false;
+  $("#promote-modal").hidden = false;
+}
+async function copyIdeaToRound(idea, round) {
+  const fields = {
+    title: idea.title, body: idea.body, category: idea.category, color: idea.color,
+    avatar_style: idea.avatar_style, avatar_seed: idea.avatar_seed, author: idea.author,
+    round, source_id: idea.id, status: "open",
+  };
+  if (DEMO) { const full = { id: uid(), created_at: new Date().toISOString(), ...fields }; demoIdeas.push(full); return full; }
+  try { return await api.addIdea(fields); }
+  catch (e) { console.error(e); alert("복제 실패: " + e.message); return null; }
+}
+async function applyPromote() {
+  const id = state.promoteId;
+  const idea = state.ideas.find((i) => i.id === id);
+  if (!idea) return;
+  const nv = $("#promote-new").value.trim();
+  const target = nv || state.promoteTarget;
+  if (!target) { alert("대상 라운드를 선택하거나 새 라운드 이름을 입력하세요."); return; }
+  const btn = $("#promote-apply");
+  btn.disabled = true;
+  const copy = await copyIdeaToRound(idea, target);
+  if (!copy) { btn.disabled = false; return; }
+  // 원본을 '선정'으로 표시
+  if (!isSelected(idea)) { if (await setStatus(id, "selected")) { idea.status = "selected"; applyRejected(id); } }
+  $("#promote-modal").hidden = true;
+  btn.disabled = false;
+  if (state.openId === id) openCard(id);
+  // 지금 보고 있는 라운드가 대상이면 즉시 캔버스에 반영
+  if (state.roundsEnabled && state.viewRound === target && !effectiveSplit()) {
+    state.ideas.push(copy); makeChar(copy); relayout(); updateEmpty();
+  }
+  toast(`'${idea.title}' → '${target}' 라운드로 복제했어요`, state.roundsEnabled && state.viewRound !== target ? { label: "그 라운드 보기", fn: () => selectRound(target) } : null);
+}
+// 간단 토스트
+let _toastTimer = null;
+function toast(msg, action) {
+  let el = $("#axdea-toast");
+  if (!el) { el = document.createElement("div"); el.id = "axdea-toast"; el.className = "toast"; document.body.appendChild(el); }
+  el.innerHTML = `<span class="toast-msg">${esc(msg)}</span>` + (action ? `<button class="toast-act">${esc(action.label)}</button>` : "");
+  if (action) el.querySelector(".toast-act").onclick = () => { el.classList.remove("show"); action.fn(); };
+  el.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove("show"), 4200);
+}
 
 // ---------- 새 아이디어 작성 ----------
 function renderComposePickers() {
@@ -893,7 +989,7 @@ function openList() {
     const box = $("#list-items");
     box.innerHTML = items.length
       ? items.map((i) => {
-          const cat = catOf(i.category), rj = isRejected(i), mine = !!state.me && i.author === state.me;
+          const cat = catOf(i.category), rj = isRejected(i), sel = isSelected(i), mine = !!state.me && i.author === state.me;
           const l = L(i), f = F(i), p = P(i), n = N(i), c = C(i);
           const author = state.reveal ? `<span class="li-author">${esc(i.author)}</span>` : `<span class="li-author muted">익명</span>`;
           const counts =
@@ -904,7 +1000,7 @@ function openList() {
             `<span class="lc-cmt" title="댓글">${icon("chat-circle", 13)}${c}</span>`;
           return `<button class="list-item${rj ? " rej" : ""}${mine ? " mine" : ""}" data-id="${i.id}">
             <span class="li-dot" style="background:${i.color}"></span>
-            <span class="li-title">${esc(i.title)}${mine ? ` <span class="li-mine">내 글</span>` : ""}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
+            <span class="li-title">${esc(i.title)}${mine ? ` <span class="li-mine">내 글</span>` : ""}${sel ? ` <span class="li-sel">${icon("star-fill", 11)}선정</span>` : ""}${rj ? ` <span class="li-rej">반려</span>` : ""}</span>
             <span class="li-counts">${counts}</span>
             <span class="li-cat" style="--cat-hue:${cat.hue}">${cat.label}</span>
             ${author}
@@ -1046,6 +1142,9 @@ $("#archive-close").onclick = () => { $("#archive-modal").hidden = true; };
 $("#mq-return").onclick = returnToActive;
 $("#split-btn").onclick = openSplit;
 $("#split-close").onclick = () => { $("#split-modal").hidden = true; };
+$("#promote-close").onclick = () => { $("#promote-modal").hidden = true; };
+$("#promote-cancel").onclick = () => { $("#promote-modal").hidden = true; };
+$("#promote-apply").onclick = applyPromote;
 let _rz, _lastSplit = false;
 window.addEventListener("resize", () => {
   clearTimeout(_rz);

@@ -3,7 +3,9 @@ create table if not exists ideas (
   id char(36) primary key, title text not null, body text,
   category varchar(32) default 'etc', color varchar(16) default '#22e3ff',
   avatar_style varchar(64), avatar_seed varchar(255), author varchar(255) not null,
-  created_at datetime(6), round varchar(255) default 'lab-day', status varchar(32) default 'open'
+  created_at datetime(6), round varchar(255) default 'lab-day', status varchar(32) default 'open',
+  source_id char(36) null, -- 선정→복제 시 원본 아이디어 id
+  key idx_ideas_source (source_id)
 ) engine=InnoDB default charset=utf8mb4;
 create table if not exists comments (
   id char(36) primary key, idea_id char(36), parent_id char(36) null, author varchar(255) not null,

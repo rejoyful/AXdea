@@ -52,6 +52,15 @@ export async function ensureSchema() {
     try { await q("alter table likes add column id bigint unsigned not null auto_increment primary key first"); } catch (e) {}
     try { await q("alter table likes add index idx_likes_idea_kind (idea_id, kind)"); } catch (e) {}
   }
+  // ideas: 선정→복제 출처 추적(source_id)
+  const icols = await q(
+    "select column_name from information_schema.columns where table_schema=database() and table_name='ideas'"
+  );
+  const ihas = new Set(icols.map((c) => c.COLUMN_NAME || c.column_name));
+  if (!ihas.has("source_id")) {
+    await q("alter table ideas add column source_id char(36) null after status");
+    try { await q("alter table ideas add index idx_ideas_source (source_id)"); } catch (e) {}
+  }
   g.__axdeaSchemaReady = true;
 }
 export const json = (data, status) => Response.json(data, status ? { status } : undefined);

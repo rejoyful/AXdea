@@ -128,6 +128,23 @@ const MARKUP = `
     </div>
   </div>
 
+  <div class="modal-scrim" id="promote-modal" hidden>
+    <div class="modal promote-card">
+      <h2>선정 · 라운드로 복제</h2>
+      <p class="sub">이 아이디어를 <b>다른 라운드로 복제</b>합니다. 원본은 그대로 남고, 복제본은 반응(좋아요·커피·댓글·해보자·아쉬워)이 <b>초기화</b>되어 실행 피드백을 새로 받습니다.</p>
+      <div class="promote-idea" id="promote-idea"></div>
+      <label class="field-label">대상 라운드 선택</label>
+      <div class="round-picker" id="promote-rounds"></div>
+      <label class="field-label">또는 새 라운드 만들기</label>
+      <input type="text" id="promote-new" placeholder="새 라운드 이름 (예: 카운잡 실행)" maxlength="255" autocomplete="off" />
+      <div class="compose-actions">
+        <button class="btn" id="promote-cancel">취소</button>
+        <button class="btn primary" id="promote-apply">복제하기</button>
+      </div>
+      <button class="modal-close" id="promote-close" aria-label="닫기"></button>
+    </div>
+  </div>
+
   <div class="modal-scrim" id="archive-modal" hidden>
     <div class="modal archive-card">
       <h2>아카이브 <span class="list-count" id="archive-count"></span></h2>
