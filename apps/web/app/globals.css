@@ -81,10 +81,6 @@
   box-shadow: 0 0 0 2px var(--accent), 0 4px 14px color-mix(in srgb, var(--accent) 24%, transparent), inset 0 0 10px rgba(60, 80, 130, 0.06);
 }
 [data-theme="light"] .li-counts .lc-pos { color: #178a54; }
-[data-theme="light"] .char.orbiting .char-halo i {
-  background: conic-gradient(from 0deg, transparent 0 80%, hsl(var(--cat-hue, 190) 75% 55% / 0.35) 87%, hsl(var(--cat-hue, 190) 80% 48%) 91%, hsl(var(--cat-hue, 190) 75% 55% / 0.35) 96%, transparent 100%);
-  filter: drop-shadow(0 0 2px hsl(var(--cat-hue, 190) 80% 55% / 0.6));
-}
 [data-theme="light"] .cat-svg { filter: drop-shadow(0 2px 4px rgba(30, 40, 70, 0.3)); }
 [data-theme="light"] .cat-eyes ellipse { fill: #2b2b2b; }
 [data-theme="light"] .fab { box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 36%, transparent), 0 6px 20px rgba(30, 40, 70, 0.18); }
@@ -318,21 +314,71 @@ html, body {
 }
 .char-ball img { width: 76%; height: 76%; pointer-events: none; filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.5)); }
 
-/* 좋아요가 쌓인 오브제: 하얀 광선이 입체적으로 빙글빙글 순환 */
+/* ===== 좋아요 인챈트 오라 — 좋아요가 쌓일수록 네온 오라가 진해지고 색이 순환 ===== */
 .char-halo { display: none; }
-.char.orbiting .char-halo {
-  display: block; position: absolute; inset: -7px; z-index: 2;
-  pointer-events: none; perspective: 240px;
+.char.enchanted .char-halo {
+  display: block; position: absolute; inset: -5px; z-index: 2;
+  pointer-events: none; border-radius: 50%;
+  animation: enchHue var(--ench-hue, 5s) linear infinite; /* 전체 색상을 천천히 순환 */
 }
-.char.orbiting .char-halo i {
+/* 1차 회전 링 (기본) */
+.char.enchanted .char-halo i {
   position: absolute; inset: 0; border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent 0 79%, rgba(255,255,255,0.4) 86%, #ffffff 91%, rgba(255,255,255,0.4) 96%, transparent 100%);
+  background: conic-gradient(from 0deg,
+    hsl(190 100% 62%), hsl(220 100% 64%), hsl(275 100% 66%),
+    hsl(322 100% 62%), hsl(45 100% 60%), hsl(145 100% 56%), hsl(190 100% 62%));
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-  filter: drop-shadow(0 0 5px #fff) drop-shadow(0 0 2px #fff);
-  animation: orbitspin var(--orbit-dur, 2s) linear infinite;
+          mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  opacity: 0.82;
+  filter: drop-shadow(0 0 3px hsl(275 100% 65%));
+  animation: enchSpin var(--ench-spin, 3.6s) linear infinite;
 }
-@keyframes orbitspin { from { transform: rotateX(64deg) rotateZ(0deg); } to { transform: rotateX(64deg) rotateZ(360deg); } }
+@keyframes enchSpin { to { transform: rotate(360deg); } }
+@keyframes enchHue  { to { filter: hue-rotate(360deg); } }
+
+/* 2단계: 링이 굵고 밝아지고, 반대로 도는 보조 링 추가 */
+.char.ench-2 .char-halo i {
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  opacity: 1;
+  filter: drop-shadow(0 0 5px hsl(275 100% 65%)) drop-shadow(0 0 2px hsl(190 100% 60%));
+}
+.char.ench-2 .char-halo::before {
+  content: ""; position: absolute; inset: -3px; border-radius: 50%;
+  background: conic-gradient(from 180deg, transparent 0 58%, hsl(190 100% 62% / 0.85) 74%, hsl(322 100% 62%) 86%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 1.5px));
+  filter: drop-shadow(0 0 3px hsl(322 100% 60%));
+  animation: enchSpin calc(var(--ench-spin, 3.6s) * 1.7) linear infinite reverse;
+}
+/* 3단계: 바깥에서 숨쉬는 오라 글로우 */
+.char.ench-3 .char-halo::after {
+  content: ""; position: absolute; inset: -7px; border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 60%, hsl(275 100% 65% / 0.34) 82%, transparent 100%);
+  animation: enchPulse 1.9s ease-in-out infinite;
+}
+@keyframes enchPulse { 0%, 100% { transform: scale(0.93); opacity: 0.5; } 50% { transform: scale(1.09); opacity: 1; } }
+/* 4단계(만렙): 링이 더 밝고 빠르며 오라가 커진다 */
+.char.ench-4 .char-halo i {
+  opacity: 1;
+  filter: drop-shadow(0 0 7px hsl(275 100% 68%)) drop-shadow(0 0 3px hsl(190 100% 62%)) brightness(1.14);
+}
+.char.ench-4 .char-halo::before { filter: drop-shadow(0 0 5px hsl(322 100% 62%)) brightness(1.12); }
+.char.ench-4 .char-halo::after { inset: -10px; background: radial-gradient(closest-side, transparent 56%, hsl(322 100% 62% / 0.4) 80%, transparent 100%); animation-duration: 1.35s; }
+
+/* 라이트 모드: 오라 발광을 절제 */
+[data-theme="light"] .char.enchanted .char-halo i { opacity: 0.95; filter: drop-shadow(0 0 2px hsl(275 90% 55%)); }
+[data-theme="light"] .char.ench-2 .char-halo i { filter: drop-shadow(0 0 3px hsl(275 90% 55%)); }
+[data-theme="light"] .char.ench-3 .char-halo::after { background: radial-gradient(closest-side, transparent 62%, hsl(275 85% 58% / 0.22) 82%, transparent 100%); }
+[data-theme="light"] .char.ench-4 .char-halo::after { background: radial-gradient(closest-side, transparent 58%, hsl(322 85% 56% / 0.26) 80%, transparent 100%); }
+
+/* 모션 최소화 선호 시: 색은 유지하되 애니메이션 정지 */
+@media (prefers-reduced-motion: reduce) {
+  .char.enchanted .char-halo,
+  .char.enchanted .char-halo i,
+  .char.enchanted .char-halo::before,
+  .char.enchanted .char-halo::after { animation: none !important; }
+}
 
 /* 카테고리 + 좋아요/댓글 통합 정보 pill (겹침 방지) */
 .char-info {

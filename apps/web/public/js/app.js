@@ -309,10 +309,17 @@ function updateCharCounts(id) {
   // 좋아요가 많을수록 캐릭터가 커진다 (최대 약 2.3배)
   b.scale = 1 + Math.min(l * 0.07, 1.3);
   b.r = b.baseR * b.scale;
-  // 좋아요가 쌓이면 하얀 원형 광선이 입체적으로 순환 (많을수록 빠르게)
-  const orbiting = l >= 3;
-  b.el.classList.toggle("orbiting", orbiting);
-  if (orbiting) b.el.style.setProperty("--orbit-dur", Math.max(1.1, 2.8 - l * 0.12).toFixed(2) + "s");
+  // 좋아요 인챈트 오라 — 쌓일수록 단계가 올라가며 네온 오라가 진해지고 색이 순환한다
+  let tier = 0;
+  if (l >= 11) tier = 4; else if (l >= 7) tier = 3; else if (l >= 4) tier = 2; else if (l >= 2) tier = 1;
+  b.el.classList.toggle("enchanted", tier >= 1);
+  b.el.classList.toggle("ench-2", tier >= 2);
+  b.el.classList.toggle("ench-3", tier >= 3);
+  b.el.classList.toggle("ench-4", tier >= 4);
+  if (tier >= 1) {
+    b.el.style.setProperty("--ench-spin", Math.max(1.6, 4.2 - l * 0.16).toFixed(2) + "s"); // 많을수록 빠르게 회전
+    b.el.style.setProperty("--ench-hue", Math.max(2.4, 6.5 - l * 0.3).toFixed(2) + "s");   // 많을수록 색 순환 빠르게
+  }
   const f = state.coffeeCounts[id] || 0;
   const like = b.el.querySelector(".ci-like"), coff = b.el.querySelector(".ci-coffee"), cmt = b.el.querySelector(".ci-cmt");
   if (like) { if (l > 0) { like.innerHTML = `${icon("heart-fill", 12)}${l}`; like.hidden = false; } else like.hidden = true; }
