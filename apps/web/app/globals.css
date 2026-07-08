@@ -674,8 +674,15 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 /* 누를 때 톡 튀는 반응 */
 .like-btn.bump, .coffee-btn.bump { animation: reactbump 0.32s ease; }
 @keyframes reactbump { 0% { transform: scale(1); } 40% { transform: scale(1.16); } 100% { transform: scale(1); } }
-.cmt-count { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--text-3); font-weight: 600; }
-.cmt-count svg { display: block; }
+/* 댓글 수: 좋아요·커피와 같은 pill 톤이되, 클릭 버튼(CTA)이 아닌 읽기 전용 칩 */
+.cmt-count {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font); font-size: 15px; font-weight: 700; color: var(--text-3);
+  background: transparent; border: 1px dashed var(--border); border-radius: 999px;
+  padding: 8px 15px; cursor: default; user-select: none;
+}
+.cmt-count svg { display: block; opacity: 0.85; }
+.cmt-count b { font-weight: 800; color: var(--text-2); }
 
 .card-comments { max-height: 42vh; overflow-y: auto; margin-bottom: 12px; }
 .comment {

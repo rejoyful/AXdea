@@ -389,7 +389,7 @@ function renderSocial(id) {
   box.innerHTML =
     `<button class="like-btn${liked ? " on" : ""}" id="like-btn" title="좋아요">${icon(liked ? "heart-fill" : "heart", 17)}<b>${l}</b> 좋아요</button>` +
     `<button class="coffee-btn${coffeed ? " on" : ""}" id="coffee-btn" title="커피 한잔 하자!">${icon(coffeed ? "coffee-fill" : "coffee", 17)}<b>${f}</b> 커피</button>` +
-    `<span class="cmt-count">${icon("chat-circle", 16)} 댓글 ${c}</span>`;
+    `<span class="cmt-count" aria-label="댓글 ${c}개">${icon("chat-circle", 17)}<b>${c}</b> 댓글</span>`;
   document.getElementById("like-btn").onclick = () => toggleLike(id);
   document.getElementById("coffee-btn").onclick = () => toggleCoffee(id);
 }
