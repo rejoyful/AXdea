@@ -926,6 +926,8 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .round-chip.on .rc-cnt { background: rgba(0, 0, 0, 0.18); }
 .round-chip .rc-cur { font-size: 10.5px; font-weight: 800; color: var(--accent); }
 .round-chip.on .rc-cur { color: #05121a; }
+.promote-card #promote-new { margin-bottom: 2px; }
+.promote-card .compose-actions { margin-top: 22px; }
 
 /* ===== 토스트 ===== */
 .toast {

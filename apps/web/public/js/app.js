@@ -189,7 +189,7 @@ function setupIcons() {
   set("#split-btn .nb-ico", "columns", 18);
   set("#list-btn .nb-ico", "list", 18);
   const fab = $("#fab"); if (fab) fab.innerHTML = icon("plus", 28);
-  ["#card-close", "#list-close", "#archive-close", "#split-close"].forEach((s) => set(s, "x", 20));
+  ["#card-close", "#list-close", "#archive-close", "#split-close", "#promote-close"].forEach((s) => set(s, "x", 20));
   const mqr = $("#mq-return"); if (mqr) mqr.innerHTML = `${icon("arrow-left", 15)}<span>현재 라운드로</span>`;
 }
 function updateThemeIcon() {
@@ -662,7 +662,7 @@ async function openCard(id) {
     `<div class="card-text">${esc(idea.body || "(내용 없음)")}</div>`;
   const isOwner = !!state.me && idea.author === state.me;
   let btns = "";
-  if (state.reveal) btns += `<button class="btn primary" id="promote-btn">${icon("star", 15)} 선정 · 라운드로 복제</button>`;
+  if (state.reveal) btns += `<button class="btn primary" id="promote-btn">선정 · 라운드로 복제</button>`;
   if (!readonly()) {
     if (state.reveal && sel) btns += `<button class="btn" id="unsel-btn">선정 해제</button>`;
     if (state.reveal) btns += `<button class="btn" id="rej-btn">${rj ? "반려 취소" : "반려"}</button>`;
