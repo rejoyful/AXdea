@@ -2,18 +2,18 @@
 
 Express 서버 하나가 **앱(정적 파일) + `/api`** 를 함께 서빙하고, 데이터는 **원격 DB서버의 MySQL**에 저장합니다.
 
-## 구성 (웹서버 ≠ DB서버, 서로 다른 위치)
+## 구성 (웹서버 ≠ DB서버, 서로 다른 호스트)
 
 ```
-                 [ 웹서버 위치 ]                       [ DB서버 위치 ]
-브라우저 ─▶ https://axdea.hakjisa.kr ─(리버스프록시)─▶ Express(server.js) ──네트워크──▶ MySQL
-             (2차 도메인)                                앱 + /api               192.168.100.76:5114 / axdea
+              [ 웹서버 192.168.100.105:5114 ]            [ DB서버 192.168.100.76:3306 ]
+브라우저 ─▶ https://axdea.hakjisa.kr ─(리버스프록시)─▶ Express(server.js) ──네트워크──▶ MySQL / axdea
+             (2차 도메인)                                앱 + /api
 ```
 
 - **접속 도메인**: `axdea.hakjisa.kr` (2차 도메인) — 팀은 이 주소로 접속
-- **웹서버**: Express가 앱과 `/api`를 함께 서빙 (같은 오리진 → CORS 불필요)
-- **DB서버**: `192.168.100.76:5114` (MySQL, DB명 `axdea`) — **웹서버와 다른 위치**. 웹서버가 이 주소로 네트워크 접속
-- ⚠️ **웹서버에서 DB서버(192.168.100.76:5114)로 가는 네트워크 경로·방화벽이 열려 있어야** 합니다. (같은 사내망이라도 위치가 다르면 라우팅/방화벽 확인 필요)
+- **웹서버**: `192.168.100.105:5114` (세팅 예정, **현재는 로컬 구동**). Express가 앱과 `/api`를 함께 서빙 (같은 오리진 → CORS 불필요)
+- **DB서버**: `192.168.100.76:3306` (MySQL, DB명 `axdea`) — **웹서버와 다른 호스트**. 웹서버가 이 주소로 네트워크 접속
+- ⚠️ **웹서버(192.168.100.105)에서 DB서버(192.168.100.76:3306)로 가는 네트워크 경로·방화벽이 열려 있어야** 합니다.
 
 ## 배포 (웹서버에)
 
@@ -22,7 +22,7 @@ Express 서버 하나가 **앱(정적 파일) + `/api`** 를 함께 서빙하고
 3. 접속 정보 설정 — `server/` 에서:
    ```
    cp .env.example .env
-   # .env 에 DB_HOST=192.168.100.76, DB_PORT=5114, DB_PASSWORD=... 채우기
+   # .env 에 PORT=5114, DB_HOST=192.168.100.76, DB_PORT=3306, DB_PASSWORD=... 채우기
    ```
 4. 설치 & 실행:
    ```
@@ -30,25 +30,25 @@ Express 서버 하나가 **앱(정적 파일) + `/api`** 를 함께 서빙하고
    npm install
    npm start
    ```
-   콘솔에 `AXdea 웹서버 실행: http://0.0.0.0:8080 → DB(원격) 192.168.100.76:5114/axdea` 가 뜨면 정상.
+   콘솔에 `AXdea 웹서버 실행: http://0.0.0.0:5114 → DB(원격) 192.168.100.76:3306/axdea` 가 뜨면 정상.
 
 ## 도메인 연결 (axdea.hakjisa.kr → Express)
 
-Express는 8080 포트에서 뜹니다. 도메인·HTTPS는 **리버스 프록시(nginx 등)** 로 앞단에서 연결합니다.
+Express는 **5114** 포트에서 뜹니다. 도메인·HTTPS는 **리버스 프록시(nginx 등)** 로 앞단에서 연결합니다.
 
 nginx 예시:
 ```nginx
 server {
   server_name axdea.hakjisa.kr;
   location / {
-    proxy_pass http://127.0.0.1:8080;
+    proxy_pass http://127.0.0.1:5114;   # Express 웹서버
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $remote_addr;
   }
   # 인증서(HTTPS)는 certbot 등으로 발급 후 listen 443 ssl 설정
 }
 ```
-- DNS: `axdea.hakjisa.kr` A레코드 → 웹서버 IP
+- DNS: `axdea.hakjisa.kr` A레코드 → 웹서버 IP(192.168.100.105)
 - HTTPS 인증서: Let's Encrypt(certbot) 권장
 
 ## 상시 구동 (권장)
@@ -66,9 +66,9 @@ pm2 startup     # 안내되는 명령 1줄 실행 → 부팅 시 자동 시작
 
 | 키 | 기본값 | 설명 |
 |---|---|---|
-| `PORT` | 8080 | 웹서버(Express) 포트 (리버스 프록시가 이 포트로 프록시) |
-| `DB_HOST` | 192.168.100.76 | **DB서버** 호스트 (웹서버와 다른 위치) |
-| `DB_PORT` | 5114 | DB 포트 |
+| `PORT` | 5114 | 웹서버(Express) 포트 (리버스 프록시가 이 포트로 프록시) |
+| `DB_HOST` | 192.168.100.76 | **DB서버** 호스트 (웹서버와 다른 호스트) |
+| `DB_PORT` | 3306 | DB 포트 |
 | `DB_USER` | axdea | MySQL 사용자 |
 | `DB_PASSWORD` | (필수) | MySQL 비밀번호 |
 | `DB_NAME` | axdea | 데이터베이스 |
