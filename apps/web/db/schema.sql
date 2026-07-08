@@ -13,8 +13,11 @@ create table if not exists comments (
   constraint fk_comments_parent foreign key (parent_id) references comments(id) on delete cascade
 ) engine=InnoDB default charset=utf8mb4;
 create table if not exists likes (
-  idea_id char(36), voter varchar(255) not null, created_at datetime(6),
-  primary key (idea_id, voter),
+  id bigint unsigned not null auto_increment primary key,
+  idea_id char(36), voter varchar(255) not null,
+  kind varchar(16) not null default 'like', -- 'like' | 'coffee' (누적: 같은 사람이 여러 번 가능)
+  created_at datetime(6),
+  key idx_likes_idea (idea_id), key idx_likes_idea_kind (idea_id, kind),
   constraint fk_likes_idea foreign key (idea_id) references ideas(id) on delete cascade
 ) engine=InnoDB default charset=utf8mb4;
 create table if not exists app_state (`key` varchar(191) primary key, `value` text) engine=InnoDB default charset=utf8mb4;

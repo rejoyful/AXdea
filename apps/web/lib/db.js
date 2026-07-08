@@ -37,6 +37,21 @@ export async function ensureSchema() {
   if (!has.has("sentiment")) {
     await q("alter table comments add column sentiment varchar(16) null after body");
   }
+  // likes: 반응 종류(kind: like/coffee) + 누적 카운트(같은 사람이 여러 번 눌러도 쌓이게 복합 PK 제거)
+  const lcols = await q(
+    "select column_name from information_schema.columns where table_schema=database() and table_name='likes'"
+  );
+  const lhas = new Set(lcols.map((c) => c.COLUMN_NAME || c.column_name));
+  if (!lhas.has("kind")) {
+    await q("alter table likes add column kind varchar(16) not null default 'like' after voter");
+  }
+  if (!lhas.has("id")) {
+    // 복합 PK(idea_id,voter) 제거 전, FK가 참조하는 idea_id 인덱스를 먼저 보존
+    try { await q("alter table likes add index idx_likes_idea (idea_id)"); } catch (e) {}
+    try { await q("alter table likes drop primary key"); } catch (e) {}
+    try { await q("alter table likes add column id bigint unsigned not null auto_increment primary key first"); } catch (e) {}
+    try { await q("alter table likes add index idx_likes_idea_kind (idea_id, kind)"); } catch (e) {}
+  }
   g.__axdeaSchemaReady = true;
 }
 export const json = (data, status) => Response.json(data, status ? { status } : undefined);

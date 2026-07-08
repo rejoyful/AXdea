@@ -33,6 +33,7 @@ export const api = {
   updateComment: (id, body) => req("PATCH", `/comments/${id}`, { body }),
   deleteComment: (id) => req("DELETE", `/comments/${id}`),
   counts: (me) => req("GET", `/counts${me ? `?me=${enc(me)}` : ""}`),
-  like: (idea_id, voter) => req("POST", "/likes", { idea_id, voter }),
+  like: (idea_id, voter) => req("POST", "/likes", { idea_id, voter, kind: "like" }),
+  coffee: (idea_id, voter) => req("POST", "/likes", { idea_id, voter, kind: "coffee" }),
   unlike: (idea_id, voter) => req("DELETE", `/likes?idea_id=${enc(idea_id)}&voter=${enc(voter)}`),
 };
