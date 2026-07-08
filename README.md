@@ -1,95 +1,50 @@
 # AXdea · 아이디어 놀이터
 
-팀원들의 아이디어를 **DiceBear 캐릭터**로 띄우는 물리 캔버스 웹앱.
-캐릭터들이 화면을 탱탱볼처럼 튕겨다니고, 클릭하면 아이디어 카드가 열립니다.
-작성자는 기본적으로 **가려지며**, 이름을 **`박찬영`** 으로 입장한 세션에서만 모두의 작성자가 보입니다.
+팀원들의 아이디어를 **DiceBear 캐릭터**로 띄우는 물리 캔버스 웹앱. 캐릭터가 화면을 탱탱볼처럼 튕겨다니고,
+클릭하면 아이디어 카드가 열립니다. 작성자는 기본 **가려지며**, 이름을 **`박찬영`** 으로 입장한 세션에서만 작성자가 보입니다.
+좋아요·댓글·반려·라운드 아카이브·주제(라운드) 분할 비교 · 네온 전광판 UI 포함.
 
-> **[아키텍처 변경]** 이제 **MySQL 백엔드**로 구동합니다. Supabase에서 데이터 이전 완료.
-> 접속 도메인 **`axdea.hakjisa.kr`** (2차 도메인). 배포/실행은 **[`server/README.md`](server/README.md)** 참고.
-> 웹서버(Express, 192.168.100.105:5114)가 앱+API를 함께 서빙하고, **DB서버(192.168.100.76:3306)는 다른 호스트**의 원격 MySQL입니다.
-> 아래 Supabase 관련 안내는 이전 버전 기록입니다.
+## 구조 (모노레포 · Next.js)
 
-프론트: 정적 웹앱(빌드 없음). 백엔드: Node(Express) + MySQL. 실시간은 4초 폴링.
-
-## 무엇을 할 수 있나
-
-- `+` 버튼으로 아이디어 올리기 (제목·내용·카테고리·색상)
-- 아이디어 = 캐릭터. 잡아서 던지면 튕기고, 짧게 누르면 카드가 열림
-- 카드에서 댓글 달기
-- 상단에서 카테고리 필터 / 라이트·다크 전환
-- `박찬영` 입장 시 전체 작성자 열람 + 아이디어 삭제
-
----
-
-## 처음 한 번만: Supabase 연결 (약 3분)
-
-키를 넣기 전에도 **데모 모드**로 바로 열어볼 수 있습니다(새로고침 시 초기화).
-팀과 공유하려면 아래를 따라 실제 DB를 연결하세요.
-
-1. **프로젝트 생성**
-   [supabase.com](https://supabase.com) 로그인 → **New project** → 이름 `AXdea` → 생성(1~2분).
-
-2. **테이블 만들기**
-   좌측 메뉴 **SQL Editor** → **New query** → 이 저장소의 [`supabase.sql`](supabase.sql) 전체를 붙여넣고 **Run**.
-
-3. **키 2개 복사**
-   좌측 **Project Settings → API** 에서:
-   - `Project URL`
-   - `anon` `public` key
-
-4. **키 붙여넣기**
-   [`js/config.js`](js/config.js) 상단 두 줄을 채웁니다:
-   ```js
-   export const SB_URL = "https://xxxxxxxx.supabase.co";
-   export const SB_KEY = "여기에-anon-public-key";
-   ```
-
-> 참고: 이 anon key는 브라우저에 공개돼도 되는 키입니다. RLS 정책(내부 신뢰 기반: 익명 읽기/쓰기 허용)이 `supabase.sql`에 포함돼 있습니다. 파일럿이 끝나면 프로젝트를 삭제하거나 정책을 조이면 됩니다.
-
----
-
-## 로컬에서 실행
-
-브라우저에서 `file://` 로 열면 ES 모듈이 막히므로 간단한 서버로 엽니다:
-
-```bash
-cd AXdea
-python3 -m http.server 8000      # 또는: npx serve
-# 브라우저에서 http://localhost:8000
+```
+AXdea/
+├─ apps/web/                 # Next.js 앱 (프론트 + /api) = 배포 단위
+│  ├─ app/
+│  │  ├─ page.js             # 기존 캔버스 UI(바닐라 JS)를 그대로 감싼 페이지
+│  │  ├─ layout.js, globals.css
+│  │  ├─ lib/db.js           # MySQL 접속 풀
+│  │  └─ api/**/route.js     # REST API (MySQL) — Supabase/Express 대체
+│  ├─ public/js/{app,pure,config,api}.js   # 앱 로직(바닐라 JS)
+│  └─ db/schema.sql          # (신규 세팅용) MySQL 스키마
+├─ ecosystem.config.js       # PM2 설정 (deploy.sh용, 앱 이름 web)
+├─ .env.example              # 루트 .env 템플릿 (DB 접속정보)
+└─ deploy.sh                 # 표준 배포 스크립트(사내) — 루트에 배치해 실행
 ```
 
-## 배포 (GitHub Pages)
+- **웹서버(Next)**: `192.168.100.105:5114` — 앱 + `/api`를 한 프로세스가 서빙 (같은 오리진 → CORS 불필요)
+- **DB서버(MySQL)**: `192.168.100.76:3306`, DB명 `axdea` (**웹서버와 다른 호스트**)
+- **도메인**: `axdea.hakjisa.kr` (사내 상위 nginx가 5114로 프록시)
+- **실시간**: 4초 폴링
 
-```bash
-cd AXdea
-git remote add origin https://github.com/<계정>/AXdea.git   # 최초 1회
-git branch -M main
-git add -A && git commit -m "init: AXdea"
-git push -u origin main
+## 배포 (사내 표준 deploy.sh 사용)
+
+192.168.100.105 웹서버에서:
 ```
-GitHub → 저장소 **Settings → Pages → Branch: `main` / `root`** 저장.
-1~2분 뒤 `https://<계정>.github.io/AXdea/` 에서 접속.
+git clone https://github.com/rejoyful/AXdea.git
+cd AXdea
+cp .env.example .env         # DB_PASSWORD 등 채우기 (PORT=5114, DB_HOST=192.168.100.76, DB_PORT=3306)
+bash deploy.sh               # git pull → npm install → next build → PM2(web:5114) 재기동
+```
+`deploy.sh` 가 `apps/web` 을 빌드하고 PM2 `web`(포트 5114)로 상시 구동합니다. 도메인/HTTPS는 사내 상위 nginx가 5114로 프록시.
 
-### (선택) 저장 자동화
-rhythm처럼 "작업 후 자동 커밋·푸시"를 원하면 `.claude/settings.json`에 Stop 훅을 넣을 수 있습니다.
-rhythm 프로젝트의 `.claude/settings.json`을 그대로 복사해 오면 됩니다.
+## 로컬 개발
+```
+cd apps/web
+npm install
+DB_PASSWORD=... npm run dev      # http://localhost:5114 (DB는 원격 MySQL)
+```
+API가 안 붙으면(오프라인 등) 앱은 자동으로 로컬 데모 모드로 동작합니다.
 
----
-
-## 파일 구조
-
-| 파일 | 역할 |
-|---|---|
-| `index.html` | 마크업 (캔버스 · 헤더 · 모달) |
-| `styles.css` | Twenty 무드 UI + 캐릭터/캔버스 스타일 (라이트/다크) |
-| `js/config.js` | **Supabase 키**, 카테고리·색상·아바타 상수 |
-| `js/pure.js` | 순수 로직 (물리 · 열람 판정 · 아바타) |
-| `js/app.js` | 상태 · Supabase · 물리 루프 · 렌더 · 이벤트 |
-| `supabase.sql` | 테이블 + RLS 생성 스크립트 |
-| `test/pure.test.mjs` | 순수 로직 검증 (`npm test`) |
-
-## 커스터마이즈 팁
-
-- 카테고리/색상/아바타 스타일 → `js/config.js`
-- 전체 열람 이름(현재 `박찬영`) → `js/config.js`의 `REVEAL_NAME`
-- 캐릭터 물리 느낌(속도·마찰·튕김) → `js/app.js`의 `loop()`
+## 참고
+- 데이터는 Supabase → MySQL 이전 완료(이 저장소는 MySQL 백엔드 기준).
+- 로직 단위 테스트: `cd apps/web && npm test`.

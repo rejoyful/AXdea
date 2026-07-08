@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { isRevealer, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "../js/pure.js";
+import { isRevealer, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "../public/js/pure.js";
 
 // 열람 판정
 assert.equal(isRevealer("박찬영"), true);

@@ -1,0 +1,17 @@
+{
+  "name": "web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 5114",
+    "build": "next build",
+    "start": "next start -p 5114",
+    "test": "node test/pure.test.mjs"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.5",
+    "next": "^14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

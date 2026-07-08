@@ -1,14 +1,8 @@
-<!DOCTYPE html>
-<html lang="ko" data-theme="light">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>AXdea · 아이디어 놀이터</title>
-  <link rel="preconnect" href="https://api.dicebear.com" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <!-- 헤더 -->
+"use client";
+import { useEffect } from "react";
+
+// 기존 바닐라 앱의 마크업을 그대로 렌더하고, 마운트 후 /js/app.js(모듈)를 로드해 앱을 구동한다.
+const MARKUP = `
   <header class="topbar">
     <div class="brand">
       <span class="logo">AX<span class="logo-accent">dea</span></span>
@@ -22,7 +16,6 @@
     </div>
   </header>
 
-  <!-- 상단 중앙 LED 전광판 (현재 라운드 타이틀) -->
   <div class="marquee" id="marquee" hidden>
     <div class="mq-board" id="mq-board" title="아카이브 열기">
       <span class="mq-status"><i class="mq-dot"></i><b id="mq-label">LIVE</b></span>
@@ -31,7 +24,6 @@
     <button class="mq-return" id="mq-return" hidden>← 현재 라운드로</button>
   </div>
 
-  <!-- 물리 캔버스 -->
   <main class="stage" id="stage">
     <div class="panels" id="panels"></div>
     <p class="empty-hint" id="empty-hint">아직 아이디어가 없어요. 오른쪽 아래 <b>+</b> 로 첫 아이디어를 띄워보세요.</p>
@@ -71,21 +63,18 @@
     </div>
   </main>
 
-  <!-- 새 아이디어 FAB -->
   <button class="fab" id="fab" title="아이디어 추가" aria-label="아이디어 추가">+</button>
 
-  <!-- 이름 게이트 모달 -->
   <div class="modal-scrim" id="name-modal" hidden>
     <div class="modal name-card">
       <h2>어서오세요 👋</h2>
-      <p class="sub">이 놀이터에 들어갈 이름을 알려주세요.<br />작성자는 기본적으로 <b>가려집니다.</b></p>
-      <input type="text" id="name-input" placeholder="이름 (예: 홍길동)" maxlength="20" autocomplete="off" />
+      <p class="sub">이 놀이터에 들어갈 이름을 알려주세요.<br/>작성자는 기본적으로 <b>가려집니다.</b></p>
+      <input type="text" id="name-input" placeholder="이름 (예: 홍길동)" maxlength="20" autocomplete="off"/>
       <button class="btn primary" id="name-save">입장하기</button>
       <p class="fineprint">이름은 이 브라우저에만 저장돼요.</p>
     </div>
   </div>
 
-  <!-- 아이디어 카드 모달 -->
   <div class="modal-scrim" id="card-modal" hidden>
     <div class="modal idea-card" id="idea-card">
       <div class="card-head" id="card-head"></div>
@@ -93,7 +82,7 @@
       <div class="card-social" id="card-social"></div>
       <div class="card-comments" id="card-comments"></div>
       <form class="comment-form" id="comment-form">
-        <input type="text" id="comment-input" placeholder="댓글 남기기…" maxlength="300" autocomplete="off" />
+        <input type="text" id="comment-input" placeholder="댓글 남기기…" maxlength="300" autocomplete="off"/>
         <button class="btn" type="submit">등록</button>
       </form>
       <div class="card-footer" id="card-footer"></div>
@@ -101,11 +90,10 @@
     </div>
   </div>
 
-  <!-- 새 아이디어 작성 모달 -->
   <div class="modal-scrim" id="compose-modal" hidden>
     <div class="modal compose-card">
       <h2 id="compose-title">새 아이디어 띄우기</h2>
-      <input type="text" id="c-title" placeholder="한 줄 제목" maxlength="60" autocomplete="off" />
+      <input type="text" id="c-title" placeholder="한 줄 제목" maxlength="60" autocomplete="off"/>
       <textarea id="c-body" placeholder="무엇을 해보고 싶나요? 어떤 불편을 풀고 싶나요?" maxlength="1000" rows="4"></textarea>
       <label class="field-label">카테고리</label>
       <div class="chip-picker" id="c-category"></div>
@@ -118,7 +106,6 @@
     </div>
   </div>
 
-  <!-- 전체 아이디어 목록 모달 -->
   <div class="modal-scrim" id="list-modal" hidden>
     <div class="modal list-card">
       <h2>전체 아이디어 <span class="list-count" id="list-count"></span></h2>
@@ -127,7 +114,6 @@
     </div>
   </div>
 
-  <!-- 아카이브 모달 -->
   <div class="modal-scrim" id="archive-modal" hidden>
     <div class="modal archive-card">
       <h2>아카이브 <span class="list-count" id="archive-count"></span></h2>
@@ -138,7 +124,6 @@
     </div>
   </div>
 
-  <!-- 주제별 분할 보기 모달 -->
   <div class="modal-scrim" id="split-modal" hidden>
     <div class="modal split-card">
       <h2>라운드 분할 비교</h2>
@@ -152,7 +137,16 @@
       <button class="modal-close" id="split-close" aria-label="닫기">✕</button>
     </div>
   </div>
+`;
 
-  <script type="module" src="js/app.js"></script>
-</body>
-</html>
+export default function Page() {
+  useEffect(() => {
+    if (document.getElementById("__axdea_app")) return;
+    const s = document.createElement("script");
+    s.type = "module";
+    s.src = "/js/app.js";
+    s.id = "__axdea_app";
+    document.body.appendChild(s);
+  }, []);
+  return <div id="axdea-root" dangerouslySetInnerHTML={{ __html: MARKUP }} />;
+}
