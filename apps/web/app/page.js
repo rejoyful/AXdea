@@ -39,8 +39,10 @@ const MARKUP = `
   <div class="modal-scrim" id="name-modal" hidden>
     <div class="modal name-card">
       <h2>어서오세요 👋</h2>
-      <p class="sub">이 놀이터에 들어갈 이름을 알려주세요.<br/>작성자는 기본적으로 <b>가려집니다.</b></p>
+      <p class="sub">이름과 <b>입장 코드</b>를 입력해 주세요.<br/>작성자는 기본적으로 <b>가려집니다.</b></p>
       <input type="text" id="name-input" placeholder="이름 (예: 홍길동)" maxlength="20" autocomplete="off"/>
+      <input type="password" id="code-input" placeholder="입장 코드" maxlength="40" autocomplete="off"/>
+      <p class="name-err" id="name-err" hidden></p>
       <button class="btn primary" id="name-save">입장하기</button>
       <p class="fineprint">이름은 이 브라우저에만 저장돼요.</p>
     </div>

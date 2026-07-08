@@ -1,8 +1,8 @@
 // ===== AXdea — 앱 로직 =====
-import { CATEGORIES, COLORS, PANEL_COLORS } from "./config.js";
+import { CATEGORIES, COLORS, PANEL_COLORS, ACCESS_CODE_HASH, ADMIN_CODE_HASHES } from "./config.js";
 import { api } from "./api.js";
 import { icon } from "./icons.js";
-import { isRevealer, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "./pure.js";
+import { isRevealer, sha256HexSync, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "./pure.js";
 
 const $ = (s) => document.querySelector(s);
 const TOP_INSET = 92; // 전광판 아래로만 아이디어가 돌아다니도록 상단 여백(스테이지 기준)
@@ -41,7 +41,8 @@ try {
   if (sv && Array.isArray(sv.rounds)) { state.splitMode = !!sv.mode; state.splitRounds = sv.rounds.slice(0, 4); }
 } catch (e) { /* ignore */ }
 const readonly = () => effectiveSplit() || (state.roundsEnabled && state.viewRound !== state.activeRound);
-state.reveal = isRevealer(state.me);
+// 재접속 시 전체열람은 이전에 관리자 코드로 확인된 경우에만 복원
+state.reveal = isRevealer(state.me) && localStorage.getItem("axdea_admin") === "1";
 
 // ---------- 데이터 레이어 (백엔드 API + 데모 폴백) ----------
 let DEMO = false;                 // 부팅 시 API 헬스체크 실패하면 데모 모드
@@ -213,15 +214,48 @@ function initTheme() {
 // ---------- 이름 게이트 ----------
 function openNameModal() {
   $("#name-input").value = state.me || "";
+  $("#code-input").value = "";
+  const err = $("#name-err"); if (err) err.hidden = true;
   $("#name-modal").hidden = false;
   setTimeout(() => $("#name-input").focus(), 50);
 }
-function saveName() {
-  const v = $("#name-input").value.trim();
-  if (!v) { $("#name-input").focus(); return; }
-  state.me = v;
-  state.reveal = isRevealer(v);
-  localStorage.setItem("axdea_name", v);
+// SHA-256 → hex (본인확인용 코드 대조). 보안 컨텍스트면 네이티브, 아니면(HTTP) 순수 폴백.
+async function sha256Hex(s) {
+  try {
+    if (globalThis.crypto && crypto.subtle) {
+      const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+      return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+  } catch (e) { /* 비보안 컨텍스트 등 → 폴백 */ }
+  return sha256HexSync(s);
+}
+function showNameError(msg) {
+  const err = $("#name-err");
+  if (err) { err.textContent = msg; err.hidden = false; }
+  $("#code-input").focus();
+}
+async function saveName() {
+  const name = $("#name-input").value.trim();
+  const code = $("#code-input").value.trim();
+  if (!name) { $("#name-input").focus(); return; }
+  if (!code) { showNameError("입장 코드를 입력해 주세요."); return; }
+  const admin = isRevealer(name);
+  let h;
+  try { h = await sha256Hex(code); }
+  catch (e) { showNameError("코드 확인 중 오류가 발생했어요. 다시 시도해 주세요."); return; }
+  let reveal;
+  if (admin) {
+    // 관리자 이름은 반드시 본인 관리자 코드로만 입장 (공용 코드로는 불가)
+    if (h === ADMIN_CODE_HASHES[name]) reveal = true;
+    else { showNameError("관리자 코드가 올바르지 않습니다."); return; }
+  } else {
+    if (h === ACCESS_CODE_HASH) reveal = false;
+    else { showNameError("입장 코드가 올바르지 않습니다."); return; }
+  }
+  state.me = name;
+  state.reveal = reveal;
+  localStorage.setItem("axdea_name", name);
+  if (reveal) localStorage.setItem("axdea_admin", "1"); else localStorage.removeItem("axdea_admin");
   $("#name-modal").hidden = true;
   renderMe();
   rerenderAuthors();
@@ -1222,7 +1256,8 @@ function updateEmpty() { $("#empty-hint").style.display = state.ideas.length ? "
 
 // ---------- 이벤트 바인딩 ----------
 $("#name-save").onclick = saveName;
-$("#name-input").addEventListener("keydown", (e) => { if (e.key === "Enter") saveName(); });
+$("#name-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("#code-input").focus(); } });
+$("#code-input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) saveName(); });
 $("#me-chip").onclick = openNameModal;
 $("#list-btn").onclick = openList;
 $("#list-close").onclick = () => { $("#list-modal").hidden = true; };

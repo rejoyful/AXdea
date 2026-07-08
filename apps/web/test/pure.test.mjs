@@ -1,5 +1,13 @@
 import assert from "node:assert";
-import { isRevealer, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "../public/js/pure.js";
+import { createHash } from "node:crypto";
+import { isRevealer, sha256HexSync, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "../public/js/pure.js";
+
+// 순수 SHA-256 폴백이 표준 SHA-256과 동일한지 (ASCII·유니코드·빈문자·긴문자)
+for (const s of ["", "a", "axdea2026", "pcy2026!", "lhw2026!", "한글코드!@#", "x".repeat(100)]) {
+  assert.equal(sha256HexSync(s), createHash("sha256").update(s).digest("hex"), `sha256 mismatch: ${s}`);
+}
+// config에 박아둔 임시 해시가 실제 코드 해시와 맞는지
+assert.equal(sha256HexSync("axdea2026"), "7ead086cf2c2a0dec55a78e00bef7c1642c7fee377bcdfdfde4ba000a882405f");
 
 // 관리자(열람) 판정 — 박찬영 · 이해원
 assert.equal(isRevealer("박찬영"), true);

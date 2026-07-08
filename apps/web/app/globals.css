@@ -601,8 +601,10 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 
 /* 이름 모달 */
 .name-card { text-align: center; max-width: 460px; }
-.name-card input { margin: 4px 0 14px; text-align: center; }
-.name-card .btn { width: 100%; }
+.name-card input { margin: 4px 0 10px; text-align: center; }
+.name-card .btn { width: 100%; margin-top: 6px; }
+.name-err { margin: 0 0 8px; font-size: 12.5px; font-weight: 700; color: #ff6b6b; }
+[data-theme="light"] .name-err { color: #d63c3c; }
 .fineprint { margin: 14px 0 0; font-size: 11.5px; color: var(--text-3); }
 
 /* 작성 모달 (더 크게) */
