@@ -31,46 +31,7 @@ const MARKUP = `
   <main class="stage" id="stage">
     <div class="panels" id="panels"></div>
     <p class="empty-hint" id="empty-hint">아직 아이디어가 없어요. 오른쪽 아래 <b>+</b> 로 첫 아이디어를 띄워보세요.</p>
-    <div class="cat" id="cat" aria-hidden="true">
-      <div class="cat-inner">
-        <svg class="cat-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-          <!-- 꼬리 (살랑살랑) -->
-          <path class="cat-tail" d="M45 52 C60 50 60 32 51 31" fill="none" stroke="#e8934a" stroke-width="7" stroke-linecap="round"/>
-          <!-- 앉은 몸통 -->
-          <path d="M18 56 C15 40 22 29 32 29 C42 29 49 40 46 56 Z" fill="#f2a65a"/>
-          <path d="M32 34 C26 34 22 42 23 56 L41 56 C42 42 38 34 32 34 Z" fill="#f7b36c"/>
-          <!-- 앞발 -->
-          <ellipse cx="26" cy="54" rx="5" ry="6.5" fill="#f7b36c"/>
-          <ellipse cx="38" cy="54" rx="5" ry="6.5" fill="#f7b36c"/>
-          <path d="M23.5 55 L28.5 55 M33.5 55 L38.5 55" stroke="#e8934a" stroke-width="0.9" stroke-linecap="round"/>
-          <!-- 머리 -->
-          <g class="cat-head">
-            <path d="M21 15 L18 3 L31 12 Z" fill="#f2a65a"/>
-            <path d="M43 15 L46 3 L33 12 Z" fill="#f2a65a"/>
-            <path d="M23 13 L22 6 L30 12 Z" fill="#ffc9c9"/>
-            <path d="M41 13 L42 6 L34 12 Z" fill="#ffc9c9"/>
-            <circle cx="32" cy="22" r="15" fill="#f7b36c"/>
-            <circle cx="24.5" cy="26" r="3.2" fill="#ffb3b3" opacity="0.55"/>
-            <circle cx="39.5" cy="26" r="3.2" fill="#ffb3b3" opacity="0.55"/>
-            <g class="cat-eyes">
-              <ellipse cx="26.5" cy="21" rx="2.7" ry="3.8" fill="#2b2b2b"/>
-              <ellipse cx="37.5" cy="21" rx="2.7" ry="3.8" fill="#2b2b2b"/>
-              <circle cx="27.6" cy="19.5" r="1" fill="#fff"/>
-              <circle cx="38.6" cy="19.5" r="1" fill="#fff"/>
-            </g>
-            <path d="M30 25 L34 25 L32 27.4 Z" fill="#e26d6d"/>
-            <path d="M32 27.4 C32 29 30.4 29.6 29 29" fill="none" stroke="#d9825a" stroke-width="0.9" stroke-linecap="round"/>
-            <path d="M32 27.4 C32 29 33.6 29.6 35 29" fill="none" stroke="#d9825a" stroke-width="0.9" stroke-linecap="round"/>
-            <g stroke="#d9a06b" stroke-width="1" stroke-linecap="round">
-              <line x1="24" y1="25" x2="15" y2="24"/>
-              <line x1="24" y1="27" x2="15" y2="29"/>
-              <line x1="40" y1="25" x2="49" y2="24"/>
-              <line x1="40" y1="27" x2="49" y2="29"/>
-            </g>
-          </g>
-        </svg>
-      </div>
-    </div>
+    <div class="cats" id="cats" aria-hidden="true"></div>
   </main>
 
   <button class="fab" id="fab" title="아이디어 추가" aria-label="아이디어 추가"></button>

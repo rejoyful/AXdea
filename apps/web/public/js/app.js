@@ -232,7 +232,11 @@ function saveName() {
 // ---------- 캔버스 & 물리 ----------
 const stage = $("#stage");
 const R = () => (window.innerWidth <= 520 ? 34 : 42);
-const stageSize = () => ({ W: stage.clientWidth, H: stage.clientHeight });
+// 스테이지가 아직 레이아웃 전이라 0으로 잡히면 뷰포트 기준으로 대체(오브제가 좌상단에 뭉치는 것 방지)
+const stageSize = () => ({
+  W: stage.clientWidth || window.innerWidth || 1280,
+  H: stage.clientHeight || Math.max(320, window.innerHeight - 56) || 700,
+});
 
 function makeChar(idea) {
   const el = document.createElement("div");
@@ -309,17 +313,13 @@ function updateCharCounts(id) {
   // 좋아요가 많을수록 캐릭터가 커진다 (최대 약 2.3배)
   b.scale = 1 + Math.min(l * 0.07, 1.3);
   b.r = b.baseR * b.scale;
-  // 좋아요 인챈트 오라 — 쌓일수록 단계가 올라가며 네온 오라가 진해지고 색이 순환한다
+  // 좋아요 인챈트 궤도 — 좋아요가 쌓일수록 엇갈려 도는 색색의 광선이 늘고 빨라진다
   let tier = 0;
-  if (l >= 11) tier = 4; else if (l >= 7) tier = 3; else if (l >= 4) tier = 2; else if (l >= 2) tier = 1;
+  if (l >= 9) tier = 3; else if (l >= 5) tier = 2; else if (l >= 2) tier = 1;
   b.el.classList.toggle("enchanted", tier >= 1);
   b.el.classList.toggle("ench-2", tier >= 2);
   b.el.classList.toggle("ench-3", tier >= 3);
-  b.el.classList.toggle("ench-4", tier >= 4);
-  if (tier >= 1) {
-    b.el.style.setProperty("--ench-spin", Math.max(1.6, 4.2 - l * 0.16).toFixed(2) + "s"); // 많을수록 빠르게 회전
-    b.el.style.setProperty("--ench-hue", Math.max(2.4, 6.5 - l * 0.3).toFixed(2) + "s");   // 많을수록 색 순환 빠르게
-  }
+  if (tier >= 1) b.el.style.setProperty("--ench-spin", Math.max(1.5, 3.6 - l * 0.14).toFixed(2) + "s"); // 많을수록 빠르게
   const f = state.coffeeCounts[id] || 0;
   const like = b.el.querySelector(".ci-like"), coff = b.el.querySelector(".ci-coffee"), cmt = b.el.querySelector(".ci-cmt");
   if (like) { if (l > 0) { like.innerHTML = `${icon("heart-fill", 12)}${l}`; like.hidden = false; } else like.hidden = true; }
@@ -391,6 +391,10 @@ function rerenderAuthors() {
 }
 
 function loop() {
+  try { loopBody(); } catch (e) { if (!loop._warned) { console.error("[loop]", e); loop._warned = true; } }
+  requestAnimationFrame(loop);
+}
+function loopBody() {
   const { W, H } = stageSize();
   const ids = [...state.bodies.keys()];
   // 이동 + (자기 영역의) 벽
@@ -424,8 +428,7 @@ function loop() {
     if (b.hidden) continue;
     b.el.style.transform = `translate(${b.x}px, ${b.y}px) scale(${b.scale})`;
   }
-  if (!effectiveSplit()) updateCat(W, H);
-  requestAnimationFrame(loop);
+  if (!effectiveSplit()) updateCats(W, H);
 }
 
 // ---------- 라운드(주제) 분할 비교 ----------
@@ -472,8 +475,8 @@ function relayout() {
     }
   });
   renderPanels(regions);
-  const catEl = $("#cat");
-  if (catEl) catEl.style.display = split ? "none" : "";
+  const catsEl = $("#cats");
+  if (catsEl) catsEl.style.display = split ? "none" : "";
   $("#marquee").hidden = !state.roundsEnabled || split;
   $("#fab").style.display = readonly() ? "none" : "";
   const splitBtn = $("#split-btn");
@@ -523,11 +526,67 @@ async function openSplit() {
   $("#split-modal").hidden = false;
 }
 
-// 고양이: 아이디어를 쫓아가 폴짝 올라타 포근하게 앉아있다가 다른 아이디어로 이동
-function initCat() {
-  const el = $("#cat");
+// 고양이들: 종류별 5마리, 각자 다른 색·포즈·성격으로 아이디어 사이를 논다
+const CAT_TYPES = [
+  // target: nearest(가까운) / topLiked(인기) / roam(배회), sleepy: 자주 졸기, edge: 아래쪽 선호
+  { key: "lazy",    name: "느긋이", fur: "#e6b06a", furL: "#f6cd92", furD: "#c9924f", speed: 1.1, sitMin: 520, sitMax: 900, pounce: false, target: "nearest", sleepy: true },
+  { key: "playful", name: "폴짝이", fur: "#f2985a", furL: "#ffb98a", furD: "#d67b3d", speed: 3.6, sitMin: 110, sitMax: 230, pounce: true,  target: "nearest" },
+  { key: "aloof",   name: "새침이", fur: "#585560", furL: "#7c7883", furD: "#3f3c46", speed: 1.9, sitMin: 90,  sitMax: 200, pounce: false, target: "roam" },
+  { key: "clingy",  name: "응석이", fur: "#eae5dd", furL: "#ffffff", furD: "#cbc4b8", speed: 2.0, sitMin: 420, sitMax: 680, pounce: false, target: "topLiked" },
+  { key: "shy",     name: "부끄럼", fur: "#8b7d70", furL: "#ab9d8f", furD: "#6a5e53", speed: 2.9, sitMin: 90,  sitMax: 190, pounce: true,  target: "nearest", edge: true },
+];
+function catSVG() {
+  return `<div class="cat-inner"><svg class="cat-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <path class="cat-tail cfd-s" d="M45 52 C60 50 60 32 51 31" fill="none" stroke-width="7" stroke-linecap="round"/>
+    <path class="cf" d="M18 56 C15 40 22 29 32 29 C42 29 49 40 46 56 Z"/>
+    <path class="cfl" d="M32 34 C26 34 22 42 23 56 L41 56 C42 42 38 34 32 34 Z"/>
+    <ellipse class="cfl" cx="26" cy="54" rx="5" ry="6.5"/>
+    <ellipse class="cfl" cx="38" cy="54" rx="5" ry="6.5"/>
+    <path class="cfd-s" d="M23.5 55 L28.5 55 M33.5 55 L38.5 55" stroke-width="0.9" stroke-linecap="round"/>
+    <g class="cat-head">
+      <path class="cf" d="M21 15 L18 3 L31 12 Z"/>
+      <path class="cf" d="M43 15 L46 3 L33 12 Z"/>
+      <path d="M23 13 L22 6 L30 12 Z" fill="#ffc9c9"/>
+      <path d="M41 13 L42 6 L34 12 Z" fill="#ffc9c9"/>
+      <circle class="cfl" cx="32" cy="22" r="15"/>
+      <circle cx="24.5" cy="26" r="3.2" fill="#ffb3b3" opacity="0.5"/>
+      <circle cx="39.5" cy="26" r="3.2" fill="#ffb3b3" opacity="0.5"/>
+      <g class="cat-eyes">
+        <ellipse cx="26.5" cy="21" rx="2.7" ry="3.8" fill="#2b2b2b"/>
+        <ellipse cx="37.5" cy="21" rx="2.7" ry="3.8" fill="#2b2b2b"/>
+        <circle cx="27.6" cy="19.5" r="1" fill="#fff"/>
+        <circle cx="38.6" cy="19.5" r="1" fill="#fff"/>
+      </g>
+      <g class="cat-eyes-closed" stroke="#2b2b2b" stroke-width="1.5" fill="none" stroke-linecap="round">
+        <path d="M23.6 21 q2.9 2.6 5.8 0"/>
+        <path d="M34.6 21 q2.9 2.6 5.8 0"/>
+      </g>
+      <path d="M30 25 L34 25 L32 27.4 Z" fill="#e26d6d"/>
+      <path d="M32 27.4 C32 29 30.4 29.6 29 29" fill="none" stroke="#d9825a" stroke-width="0.9" stroke-linecap="round"/>
+      <path d="M32 27.4 C32 29 33.6 29.6 35 29" fill="none" stroke="#d9825a" stroke-width="0.9" stroke-linecap="round"/>
+      <g class="whiskers" stroke="#b9b9b9" stroke-width="1" stroke-linecap="round" opacity="0.7">
+        <line x1="24" y1="25" x2="15" y2="24"/><line x1="24" y1="27" x2="15" y2="29"/>
+        <line x1="40" y1="25" x2="49" y2="24"/><line x1="40" y1="27" x2="49" y2="29"/>
+      </g>
+    </g>
+  </svg></div>`;
+}
+function initCats() {
+  const cont = $("#cats");
+  if (!cont) return;
+  cont.innerHTML = "";
   const { W, H } = stageSize();
-  state.cat = { x: W * 0.35, y: H - 46, vx: 1.4, dir: 1, targetId: null, mode: "seek", sit: 0, el };
+  state.cats = CAT_TYPES.map((t, i) => {
+    const el = document.createElement("div");
+    el.className = "cat cat-" + t.key;
+    el.style.setProperty("--fur", t.fur);
+    el.style.setProperty("--fur-l", t.furL);
+    el.style.setProperty("--fur-d", t.furD);
+    el.innerHTML = catSVG() + `<div class="cat-name">${t.name}</div>`;
+    cont.appendChild(el);
+    return { el, type: t, x: (W * (i + 1)) / (CAT_TYPES.length + 1), y: H - 44 - Math.random() * 30,
+             vx: (Math.random() < 0.5 ? -1 : 1) * (t.speed * 0.4), dir: 1, targetId: null, mode: "seek", sit: 0, sitTotal: 0, restTimer: 0 };
+  });
 }
 function hopCat(cat) {
   cat.el.classList.remove("pounce");
@@ -535,55 +594,83 @@ function hopCat(cat) {
   cat.el.classList.add("pounce");
   setTimeout(() => cat.el.classList.remove("pounce"), 420);
 }
-function updateCat(W, H) {
-  const cat = state.cat;
-  if (!cat) return;
-  const baseY = H - 46;
+function nearestIdea(cat) {
+  let best = null, bd = Infinity;
+  state.bodies.forEach((b, id) => {
+    if (b.dragging || b.hidden) return;
+    const d = Math.abs(b.x - cat.x) + Math.abs(b.y - cat.y) * 0.7;
+    if (d < bd) { bd = d; best = id; }
+  });
+  return best;
+}
+function pickCatTarget(cat) {
+  const t = cat.type;
+  if (t.target === "topLiked") {
+    let best = null, bl = -1;
+    state.bodies.forEach((b, id) => { if (b.dragging || b.hidden) return; const l = state.likeCounts[id] || 0; if (l > bl) { bl = l; best = id; } });
+    return best;
+  }
+  if (t.target === "roam") return Math.random() < 0.004 ? nearestIdea(cat) : null; // 대부분 배회, 가끔만 올라탐
+  return nearestIdea(cat);
+}
+function placeCat(cat) {
+  cat.el.style.transform = `translate(${cat.x}px, ${cat.y}px)`;
+  cat.el.style.setProperty("--dir", cat.dir);
+}
+function updateCats(W, H) {
+  if (!state.cats) return;
+  state.cats.forEach((cat) => updateOneCat(cat, W, H));
+}
+function updateOneCat(cat, W, H) {
+  const t = cat.type;
   const target = cat.targetId ? state.bodies.get(cat.targetId) : null;
 
-  // 앉아있는 중: 아이디어 위에 포근하게 얹혀 함께 이동
+  // 아이디어 위에 올라타 앉기 (함께 이동)
   if (cat.mode === "riding" && target && !target.dragging && !target.hidden) {
     const topY = target.y - target.r - 14;
     cat.x += (target.x - cat.x) * 0.4;
     cat.y += (topY - cat.y) * 0.4;
     cat.sit -= 1;
     cat.el.classList.add("sitting");
-    if (cat.sit <= 0) { cat.mode = "seek"; cat.targetId = null; hopCat(cat); }
-    cat.el.style.transform = `translate(${cat.x}px, ${cat.y}px) scaleX(${cat.dir})`;
+    cat.el.classList.remove("walking");
+    // 성격상 졸음이 많은 고양이는 자리 잡은 뒤 눈 감고 존다
+    cat.el.classList.toggle("sleeping", !!(t.sleepy && cat.sit < cat.sitTotal - 45));
+    if (cat.sit <= 0) { cat.mode = "seek"; cat.targetId = null; cat.el.classList.remove("sleeping"); hopCat(cat); }
+    placeCat(cat);
     return;
   }
   cat.el.classList.remove("sitting");
 
-  // 쫓아가기: 타겟 선정(가장 가까운 아이디어)
-  if (!target || target.dragging || target.hidden) {
-    let best = null, bd = Infinity;
-    state.bodies.forEach((b, id) => {
-      if (b.dragging || b.hidden) return;
-      const d = Math.abs(b.x - cat.x) + Math.abs(b.y - cat.y) * 0.7;
-      if (d < bd) { bd = d; best = id; }
-    });
-    cat.targetId = best;
-  }
+  if (!target || target.dragging || target.hidden) cat.targetId = pickCatTarget(cat);
   const tgt = cat.targetId ? state.bodies.get(cat.targetId) : null;
   if (tgt) {
     const dx = tgt.x - cat.x;
-    cat.vx = Math.max(-3.8, Math.min(3.8, dx * 0.06));
+    cat.vx = Math.max(-t.speed, Math.min(t.speed, dx * 0.06));
     if (Math.abs(cat.vx) > 0.25) cat.dir = cat.vx > 0 ? 1 : -1;
     cat.x += cat.vx;
     const topY = tgt.y - tgt.r - 14;
     cat.y += (topY - cat.y) * 0.13;
+    cat.el.classList.toggle("walking", Math.abs(cat.vx) > 0.5);
+    cat.el.classList.remove("sleeping");
     if (Math.hypot(tgt.x - cat.x, tgt.y - cat.y) < tgt.r + 22) {
-      cat.mode = "riding";           // 올라타 앉기
-      cat.sit = 260 + Math.floor(Math.random() * 220); // ~4~8초
-      hopCat(cat);
+      cat.mode = "riding";
+      cat.sitTotal = t.sitMin + Math.floor(Math.random() * (t.sitMax - t.sitMin));
+      cat.sit = cat.sitTotal;
+      if (t.pounce) hopCat(cat);
     }
   } else {
+    // 바닥 배회
+    if (!cat.vx) cat.vx = t.speed * 0.4 * (cat.dir || 1);
     cat.x += cat.vx;
-    if (cat.x < 44 || cat.x > W - 44) cat.vx *= -1;
-    cat.y += (baseY - cat.y) * 0.08;
+    if (cat.x < 44 || cat.x > W - 44) { cat.vx *= -1; cat.dir = cat.vx > 0 ? 1 : -1; }
+    const baseY = (t.edge ? H - 30 : H - 44);
+    cat.y += (baseY - cat.y) * 0.06;
+    cat.el.classList.toggle("walking", Math.abs(cat.vx) > 0.5);
+    // 느긋이는 배회 중에도 가끔 멈춰 존다
+    if (t.sleepy) { cat.restTimer++; const nap = (cat.restTimer % 620) > 400; cat.el.classList.toggle("sleeping", nap); if (nap) { cat.vx *= 0.55; cat.el.classList.remove("walking"); } }
   }
   cat.x = Math.max(30, Math.min(W - 30, cat.x));
-  cat.el.style.transform = `translate(${cat.x}px, ${cat.y}px) scaleX(${cat.dir})`;
+  placeCat(cat);
 }
 
 // ---------- 드래그 / 던지기 / 클릭 ----------
@@ -1262,7 +1349,7 @@ async function boot() {
   applyFilter();
   updateEmpty();
   updateRoundUI();
-  initCat();
+  initCats();
   relayout();
   requestAnimationFrame(loop);
   await refreshCounts();
