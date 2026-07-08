@@ -458,7 +458,7 @@ html, body {
   z-index: 50;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: clamp(16px, 3.5vh, 36px);
   background: rgba(15, 15, 25, 0.42);
   backdrop-filter: blur(3px);
   animation: fade 0.16s ease;
@@ -469,12 +469,14 @@ html, body {
 .modal {
   position: relative;
   width: 100%;
-  max-width: 440px;
+  max-width: 560px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: 18px;
   box-shadow: var(--shadow-lg), 0 0 0 1px var(--accent-weak), 0 0 40px color-mix(in srgb, var(--accent) 12%, transparent);
-  padding: 26px;
+  padding: 30px;
   animation: rise 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 .modal h2 { color: var(--text); }
@@ -525,13 +527,13 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .btn.primary:disabled { opacity: 0.45; cursor: default; filter: none; box-shadow: none; }
 
 /* 이름 모달 */
-.name-card { text-align: center; max-width: 380px; }
+.name-card { text-align: center; max-width: 460px; }
 .name-card input { margin: 4px 0 14px; text-align: center; }
 .name-card .btn { width: 100%; }
 .fineprint { margin: 14px 0 0; font-size: 11.5px; color: var(--text-3); }
 
 /* 작성 모달 (더 크게) */
-.compose-card { max-width: 560px; }
+.compose-card { max-width: 680px; }
 .compose-card input, .compose-card textarea { margin-bottom: 12px; }
 .compose-card #c-title { font-size: 16px; font-weight: 700; padding: 13px 15px; }
 .compose-card #c-body { min-height: 150px; font-size: 15px; }
@@ -600,7 +602,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .cmt-count { display: inline-flex; align-items: center; gap: 5px; font-size: 14px; color: var(--text-3); font-weight: 600; }
 .cmt-count svg { display: block; }
 
-.card-comments { max-height: 36vh; overflow-y: auto; margin-bottom: 12px; }
+.card-comments { max-height: 42vh; overflow-y: auto; margin-bottom: 12px; }
 .comment {
   display: flex; align-items: flex-start; gap: 8px;
   font-size: 14px; line-height: 1.6; color: var(--text);
@@ -686,7 +688,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 }
 
 /* ===== 전체 목록 ===== */
-.list-card { max-width: 680px; }
+.list-card { max-width: 920px; }
 .list-count { color: var(--text-3); font-weight: 500; font-size: 15px; }
 /* 정렬 바 */
 .list-sort { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin: 14px 0 4px; }
@@ -698,7 +700,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 }
 .ls-btn:hover { border-color: var(--border-strong); color: var(--text); }
 .ls-btn.on { color: #05121a; background: var(--accent); border-color: transparent; box-shadow: 0 0 12px var(--accent-weak); }
-.list-items { max-height: 60vh; overflow-y: auto; overflow-x: hidden; margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.list-items { max-height: 64vh; overflow-y: auto; overflow-x: hidden; margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
 .list-item {
   display: flex; align-items: flex-start; gap: 11px; width: 100%; text-align: left;
   font-family: var(--font); background: var(--surface-2);
@@ -775,7 +777,9 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .mq-return svg { display: block; }
 .mq-return:hover { border-color: var(--border-strong); }
 @media (max-width: 520px) { .marquee { top: 60px; } .mq-track span { font-size: 19px; letter-spacing: 3px; } }
-.archive-card { max-width: 520px; }
+.archive-card { max-width: 700px; }
+.split-card { max-width: 760px; }
+.idea-card { max-width: 640px; }
 .round-item { justify-content: flex-start; gap: 10px; }
 .round-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .round-badge { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--text-2); background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; }
