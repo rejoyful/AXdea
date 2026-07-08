@@ -1,5 +1,6 @@
 // ===== AXdea — 앱 로직 =====
-import { SB_URL, SB_KEY, CATEGORIES, COLORS } from "./config.js";
+import { CATEGORIES, COLORS } from "./config.js";
+import { api } from "./api.js";
 import { isRevealer, pickAvatar, stepBody, resolveWall, resolveWallRegion, resolveCollision, layoutRegions } from "./pure.js";
 
 const $ = (s) => document.querySelector(s);
@@ -35,19 +36,13 @@ try {
 const readonly = () => effectiveSplit() || (state.roundsEnabled && state.viewRound !== state.activeRound);
 state.reveal = isRevealer(state.me);
 
-// ---------- 데이터 레이어 (Supabase + 데모 폴백) ----------
-const sb = (SB_URL && SB_KEY && window.supabase) ? window.supabase.createClient(SB_URL, SB_KEY) : null;
-const DEMO = !sb;
+// ---------- 데이터 레이어 (백엔드 API + 데모 폴백) ----------
+let DEMO = false;                 // 부팅 시 API 헬스체크 실패하면 데모 모드
 let demoIdeas = [];
 let demoComments = [];
 let demoLikes = [];
 let demoSeq = 0;
 const uid = () => `demo-${Date.now()}-${demoSeq++}`;
-
-if (DEMO) {
-  console.warn("[AXdea] Supabase 키가 없어 데모 모드로 동작합니다. js/config.js에 SB_URL/SB_KEY를 채우세요.");
-  demoIdeas = seedDemo();
-}
 
 async function loadIdeas() {
   const split = effectiveSplit();
@@ -55,142 +50,95 @@ async function loadIdeas() {
     if (split) return demoIdeas.filter((i) => state.splitRounds.includes(i.round || "lab-day"));
     return demoIdeas.filter((i) => !state.roundsEnabled || (i.round || "lab-day") === state.viewRound);
   }
-  let q = sb.from("ideas").select("*").order("created_at", { ascending: true });
-  if (split) q = q.in("round", state.splitRounds);
-  else if (state.roundsEnabled) q = q.eq("round", state.viewRound);
-  const { data, error } = await q;
-  if (error) { console.error(error); return []; }
-  return data || [];
+  if (split) return await api.ideasByRounds(state.splitRounds);
+  if (state.roundsEnabled) return await api.ideasByRound(state.viewRound);
+  return await api.allIdeas();
 }
-// 아카이브 구조(라운드 컬럼 + app_state 테이블) 사용 가능 여부 감지
+// 백엔드 연결 확인 — 실패하면 데모 모드로 전환. 라운드 기능은 항상 사용 가능.
 async function detectRounds() {
   if (DEMO) return true;
-  const [r1, r2] = await Promise.all([
-    sb.from("ideas").select("round").limit(1),
-    sb.from("app_state").select("key").limit(1),
-  ]);
-  return !r1.error && !r2.error;
+  try { await api.health(); return true; }
+  catch (e) { console.warn("[AXdea] API 연결 실패 → 데모 모드로 전환", e); DEMO = true; demoIdeas = seedDemo(); return true; }
 }
 async function loadActiveRound() {
   if (DEMO) return "lab-day";
-  const { data, error } = await sb.from("app_state").select("value").eq("key", "active_round").maybeSingle();
-  if (error || !data) return "lab-day";
-  return data.value || "lab-day";
+  const r = await api.getState("active_round");
+  return (r && r.value) || "lab-day";
 }
 async function setActiveRoundDB(name) {
   if (DEMO) return true;
-  const { error } = await sb.from("app_state").upsert({ key: "active_round", value: name }).select();
-  if (error) { console.error(error); alert("라운드 전환 실패: " + error.message); return false; }
-  return true;
+  try { await api.putState("active_round", name); return true; }
+  catch (e) { console.error(e); alert("라운드 전환 실패: " + e.message); return false; }
 }
 // 라운드 목록 + 아이디어 수 (최신 활동 순)
 async function loadRounds() {
   const counts = {}, last = {};
-  const bump = (r, ts) => { r = r || "lab-day"; counts[r] = (counts[r] || 0) + 1; if (!last[r] || ts > last[r]) last[r] = ts; };
-  if (DEMO) { demoIdeas.forEach((i) => bump(i.round, i.created_at)); }
-  else {
-    const { data } = await sb.from("ideas").select("round,created_at");
-    (data || []).forEach((i) => bump(i.round, i.created_at));
+  if (DEMO) {
+    demoIdeas.forEach((i) => { const r = i.round || "lab-day"; counts[r] = (counts[r] || 0) + 1; if (!last[r] || i.created_at > last[r]) last[r] = i.created_at; });
+  } else {
+    const rows = await api.rounds();
+    rows.forEach((r) => { const key = r.round || "lab-day"; counts[key] = Number(r.count); last[key] = r.last || ""; });
   }
-  if (!counts[state.activeRound]) { counts[state.activeRound] = 0; last[state.activeRound] = last[state.activeRound] || ""; }
+  if (!(state.activeRound in counts)) { counts[state.activeRound] = 0; last[state.activeRound] = last[state.activeRound] || ""; }
   return Object.keys(counts).map((r) => ({ round: r, count: counts[r], last: last[r] || "" }))
-    .sort((a, b) => (b.last || "").localeCompare(a.last || ""));
+    .sort((a, b) => String(b.last || "").localeCompare(String(a.last || "")));
 }
 async function addIdea(fields) {
   const av = pickAvatar(`${fields.author}-${Date.now()}-${Math.random()}`);
   const row = { ...fields, avatar_style: av.style, avatar_seed: av.seed };
   if (state.roundsEnabled) row.round = state.activeRound;
-  if (DEMO) {
-    const full = { id: uid(), created_at: new Date().toISOString(), ...row };
-    demoIdeas.push(full);
-    return full;
-  }
-  const { data, error } = await sb.from("ideas").insert(row).select().single();
-  if (error) { console.error(error); alert("저장 실패: " + error.message); return null; }
-  return data;
+  if (DEMO) { const full = { id: uid(), created_at: new Date().toISOString(), status: "open", ...row }; demoIdeas.push(full); return full; }
+  try { return await api.addIdea(row); }
+  catch (e) { console.error(e); alert("저장 실패: " + e.message); return null; }
 }
 async function loadComments(ideaId) {
   if (DEMO) return demoComments.filter((c) => c.idea_id === ideaId);
-  const { data, error } = await sb.from("comments").select("*").eq("idea_id", ideaId).order("created_at", { ascending: true });
-  if (error) { console.error(error); return []; }
-  return data || [];
+  try { return await api.comments(ideaId); } catch (e) { console.error(e); return []; }
 }
 // 댓글 수 + 좋아요 수 + 내 좋아요 집계 (한 번에 로드)
 async function loadCounts() {
-  const cc = {}, lc = {}, mine = new Set();
   if (DEMO) {
+    const cc = {}, lc = {}, mine = new Set();
     demoComments.forEach((c) => { cc[c.idea_id] = (cc[c.idea_id] || 0) + 1; });
     demoLikes.forEach((l) => { lc[l.idea_id] = (lc[l.idea_id] || 0) + 1; if (l.voter === state.me) mine.add(l.idea_id); });
     return { cc, lc, mine };
   }
-  const [cRes, lRes] = await Promise.all([
-    sb.from("comments").select("idea_id"),
-    sb.from("likes").select("idea_id,voter"),
-  ]);
-  (cRes.data || []).forEach((c) => { cc[c.idea_id] = (cc[c.idea_id] || 0) + 1; });
-  (lRes.data || []).forEach((l) => { lc[l.idea_id] = (lc[l.idea_id] || 0) + 1; if (l.voter === state.me) mine.add(l.idea_id); });
-  return { cc, lc, mine };
+  try { const d = await api.counts(state.me); return { cc: d.commentCounts || {}, lc: d.likeCounts || {}, mine: new Set(d.myLikes || []) }; }
+  catch (e) { console.error(e); return { cc: {}, lc: {}, mine: new Set() }; }
 }
 async function likeIdea(id) {
   if (DEMO) { if (!demoLikes.some((l) => l.idea_id === id && l.voter === state.me)) demoLikes.push({ idea_id: id, voter: state.me }); return true; }
-  const { error } = await sb.from("likes").insert({ idea_id: id, voter: state.me });
-  if (error && error.code !== "23505") { console.error(error); alert("좋아요 실패: likes 테이블이 필요합니다. supabase.sql 참고\n" + error.message); return false; }
-  return true;
+  try { await api.like(id, state.me); return true; } catch (e) { console.error(e); alert("좋아요 실패: " + e.message); return false; }
 }
 async function unlikeIdea(id) {
   if (DEMO) { demoLikes = demoLikes.filter((l) => !(l.idea_id === id && l.voter === state.me)); return true; }
-  const { error } = await sb.from("likes").delete().eq("idea_id", id).eq("voter", state.me);
-  if (error) { console.error(error); alert("좋아요 취소 실패: " + error.message); return false; }
-  return true;
+  try { await api.unlike(id, state.me); return true; } catch (e) { console.error(e); alert("좋아요 취소 실패: " + e.message); return false; }
 }
 async function addComment(ideaId, author, body) {
-  const row = { idea_id: ideaId, author, body };
-  if (DEMO) { const full = { id: uid(), created_at: new Date().toISOString(), ...row }; demoComments.push(full); return full; }
-  const { data, error } = await sb.from("comments").insert(row).select().single();
-  if (error) { console.error(error); return null; }
-  return data;
+  if (DEMO) { const full = { id: uid(), created_at: new Date().toISOString(), idea_id: ideaId, author, body }; demoComments.push(full); return full; }
+  try { return await api.addComment(ideaId, author, body); } catch (e) { console.error(e); return null; }
 }
 async function updateComment(id, body) {
   if (DEMO) { const c = demoComments.find((x) => x.id === id); if (c) c.body = body; return true; }
-  const { data, error } = await sb.from("comments").update({ body }).eq("id", id).select();
-  if (error || !data || data.length === 0) { console.error("comment update failed", error); alert("댓글 수정 실패: DB에 comments update 정책이 필요합니다. supabase.sql 참고"); return false; }
-  return true;
+  try { await api.updateComment(id, body); return true; } catch (e) { console.error(e); alert("댓글 수정 실패: " + e.message); return false; }
 }
 async function deleteComment(id) {
   if (DEMO) { demoComments = demoComments.filter((x) => x.id !== id); return true; }
-  const { data, error } = await sb.from("comments").delete().eq("id", id).select();
-  if (error || !data || data.length === 0) { console.error("comment delete failed", error); alert("댓글 삭제 실패: DB에 comments delete 정책이 필요합니다. supabase.sql 참고"); return false; }
-  return true;
+  try { await api.deleteComment(id); return true; } catch (e) { console.error(e); alert("댓글 삭제 실패: " + e.message); return false; }
 }
 async function deleteIdea(id) {
   if (DEMO) { demoIdeas = demoIdeas.filter((i) => i.id !== id); return; }
-  const { error } = await sb.from("ideas").delete().eq("id", id);
-  if (error) console.error(error);
+  try { await api.deleteIdea(id); } catch (e) { console.error(e); }
 }
 async function updateIdea(id, fields) {
-  if (DEMO) {
-    const it = demoIdeas.find((i) => i.id === id); if (it) Object.assign(it, fields);
-    const s = state.ideas.find((i) => i.id === id); if (s) Object.assign(s, fields);
-    return true;
-  }
-  const { data, error } = await sb.from("ideas").update(fields).eq("id", id).select();
-  if (error || !data || data.length === 0) {
-    console.error("update failed", error);
-    alert("수정 실패: DB에 update 권한 정책이 없습니다.\nSupabase SQL Editor에서 supabase.sql의 update 정책을 실행해 주세요.");
-    return false;
-  }
+  if (DEMO) { const it = demoIdeas.find((i) => i.id === id); if (it) Object.assign(it, fields); const s = state.ideas.find((i) => i.id === id); if (s) Object.assign(s, fields); return true; }
+  try { await api.updateIdea(id, fields); } catch (e) { console.error(e); alert("수정 실패: " + e.message); return false; }
   const s = state.ideas.find((i) => i.id === id); if (s) Object.assign(s, fields);
   return true;
 }
 async function setStatus(id, status) {
   if (DEMO) { const it = demoIdeas.find((i) => i.id === id); if (it) it.status = status; return true; }
-  const { data, error } = await sb.from("ideas").update({ status }).eq("id", id).select();
-  if (error || !data || data.length === 0) {
-    console.error("status update failed", error);
-    alert("상태 변경 실패: DB에 status 컬럼과 update 정책이 필요합니다.\nSupabase SQL Editor에서 supabase.sql의 해당 SQL을 실행해 주세요.");
-    return false;
-  }
-  return true;
+  try { await api.updateIdea(id, { status }); return true; } catch (e) { console.error(e); alert("상태 변경 실패: " + e.message); return false; }
 }
 
 function seedDemo() {
@@ -849,7 +797,7 @@ async function reloadBoard() {
   await refreshCounts();
 }
 async function openArchive() {
-  if (!state.roundsEnabled) { alert("아카이브 기능을 켜려면 supabase.sql의 라운드 설정을 실행해야 합니다."); return; }
+  if (!state.roundsEnabled) { alert("백엔드에 연결되지 않아 아카이브 기능을 쓸 수 없습니다. 서버 실행 여부를 확인해 주세요."); return; }
   const rounds = await loadRounds();
   $("#archive-count").textContent = `(${rounds.length})`;
   const box = $("#archive-items");
@@ -904,13 +852,12 @@ async function renameRound(oldName) {
   const rounds = await loadRounds();
   if (rounds.some((r) => r.round === newName)) { alert("이미 있는 라운드 이름이에요."); return; }
   const isActive = oldName === state.activeRound;
-  // 해당 라운드의 아이디어들도 새 이름으로 이동
+  // 해당 라운드의 아이디어들도 새 이름으로 이동 (백엔드가 ideas + app_state를 트랜잭션으로 처리)
   if (DEMO) { demoIdeas.forEach((i) => { if ((i.round || "lab-day") === oldName) i.round = newName; }); }
   else {
-    const upd = await sb.from("ideas").update({ round: newName }).eq("round", oldName).select();
-    if (upd.error) { console.error(upd.error); alert("이름 변경 실패: " + upd.error.message); return; }
+    try { await api.renameRound(oldName, newName); } catch (e) { console.error(e); alert("이름 변경 실패: " + e.message); return; }
   }
-  if (isActive) { const ok = await setActiveRoundDB(newName); if (!ok) return; state.activeRound = newName; }
+  if (isActive) state.activeRound = newName;
   if (state.viewRound === oldName) state.viewRound = newName;
   await reloadBoard();
   openArchive();
@@ -1012,18 +959,7 @@ async function refreshOpenComments() { if (!DEMO && state.openId) renderComments
 
 function startSync() {
   if (DEMO) return;
-  // 1) Supabase Realtime — 퍼블리케이션이 켜져 있으면 즉시 반영
-  try {
-    sb.channel("axdea-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ideas" }, () => refreshIdeas())
-      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, (p) => {
-        refreshCounts();
-        if (p.new && p.new.idea_id === state.openId) refreshOpenComments();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, () => refreshCounts())
-      .subscribe();
-  } catch (e) { console.warn("[AXdea] realtime 미사용, 폴링으로 동작", e); }
-  // 2) 폴링 폴백 — realtime이 꺼져 있어도 새로고침 없이 반영
+  // 4초 폴링으로 새로고침 없이 반영 (백엔드는 폴링 방식)
   setInterval(refreshIdeas, 4000);
   setInterval(refreshOpenComments, 4000);
   setInterval(refreshCounts, 4000);

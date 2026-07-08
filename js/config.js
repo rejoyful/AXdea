@@ -1,8 +1,7 @@
 // AXdea 설정
-// ── Supabase: supabase.com에서 AXdea 프로젝트 만든 뒤 아래 2줄만 채우세요.
-//    (비워두면 브라우저 로컬 데모 모드로 동작합니다 — 새로고침 시 초기화)
-export const SB_URL = "https://oqnluqfzcdbpmwoxjnoh.supabase.co";
-export const SB_KEY = "sb_publishable_k0aWd3vDWjsyOsOS9rubWQ_Xq3MuSas";
+// ── 백엔드 API 주소. 앱과 API를 같은 서버(Express)가 서빙하므로 상대경로 "/api" 사용.
+//    (앱을 다른 곳에서 열어 API가 없으면 자동으로 로컬 데모 모드로 동작)
+export const API_BASE = "/api";
 
 // 전체 열람 권한을 가진 이름 (정확히 일치할 때만 작성자 공개)
 export const REVEAL_NAME = "박찬영";
