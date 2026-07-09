@@ -195,7 +195,7 @@ function renderMe() {
   chip.textContent = state.me ? (state.reveal ? `${state.me} · 전체열람` : state.me) : "이름 설정";
   chip.classList.toggle("reveal", state.reveal);
   const nr = $("#new-round-btn");
-  if (nr) nr.hidden = !(state.reveal && state.roundsEnabled); // 관리자 + 라운드 기능 있을 때만
+  if (nr) nr.hidden = !(state.me && state.roundsEnabled); // 모든 사용자가 새 라운드 시작 가능
 }
 // 정적 버튼들에 Phosphor 아이콘 주입 (플랫폼 전체 아이콘 통일)
 function setupIcons() {
@@ -1187,7 +1187,7 @@ function openList() {
 // ---------- 라운드 / 아카이브 ----------
 function updateRoundUI() {
   const marquee = $("#marquee"), archiveBtn = $("#archive-btn"), newRoundBtn = $("#new-round-btn");
-  if (newRoundBtn) newRoundBtn.hidden = !(state.reveal && state.roundsEnabled);
+  if (newRoundBtn) newRoundBtn.hidden = !(state.me && state.roundsEnabled);
   if (!state.roundsEnabled) { marquee.hidden = true; archiveBtn.hidden = true; return; }
   archiveBtn.hidden = false;
   marquee.hidden = false;
@@ -1246,10 +1246,8 @@ async function openArchive() {
   box.querySelectorAll(".round-del").forEach((btn) => {
     btn.onclick = (e) => { e.stopPropagation(); deleteRoundFn(btn.dataset.del); };
   });
-  // '새 라운드 시작'은 상단 헤더 버튼으로 이동 — 모달 하단은 관리자에게만 안내
-  $("#archive-actions").innerHTML = state.reveal
-    ? `<p class="fineprint" style="margin:0">새 라운드는 우측 상단 <b>＋ 새 라운드</b> 버튼으로 시작해요.</p>`
-    : "";
+  // '새 라운드 시작'은 상단 헤더 버튼으로 이동 (모든 사용자)
+  $("#archive-actions").innerHTML = `<p class="fineprint" style="margin:0">새 라운드는 우측 상단 <b>＋ 새 라운드</b> 버튼으로 시작해요.</p>`;
   $("#archive-modal").hidden = false;
 }
 async function selectRound(name) {
