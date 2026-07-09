@@ -22,6 +22,7 @@ export const api = {
   putState: (k, value) => req("PUT", `/state/${enc(k)}`, { value }),
   rounds: () => req("GET", "/rounds"),
   renameRound: (from, to) => req("POST", "/rounds/rename", { from, to }),
+  deleteRound: (round) => req("POST", "/rounds/delete", { round }),
   ideasByRound: (round) => req("GET", `/ideas?round=${enc(round)}`),
   ideasByRounds: (rounds) => req("GET", `/ideas?rounds=${enc(rounds.join(","))}`),
   allIdeas: () => req("GET", "/ideas"),

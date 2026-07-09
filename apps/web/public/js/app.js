@@ -1223,23 +1223,28 @@ async function openArchive() {
   box.innerHTML = rounds.map((r) => {
     const active = r.round === state.activeRound;
     const viewing = r.round === state.viewRound;
-    const renameBtn = state.reveal ? `<button class="round-edit" data-rename="${esc(r.round)}" title="이름 변경">${icon("pencil-simple", 15)}</button>` : "";
+    const renameBtn = state.reveal ? `<button class="round-icon-btn round-edit" data-rename="${esc(r.round)}" title="이름 변경">${icon("pencil-simple", 15)}</button>` : "";
+    // 활성(진행 중) 라운드는 삭제 불가
+    const delBtn = state.reveal && !active ? `<button class="round-icon-btn round-del" data-del="${esc(r.round)}" title="라운드 삭제">${icon("trash", 15)}</button>` : "";
     return `<div class="round-card${viewing ? " viewing" : ""}${active ? " live" : ""}" data-round="${esc(r.round)}" role="button" tabindex="0">
       <div class="rc-head">
         <span class="round-badge${active ? " live" : ""}">${active ? "진행 중" : "아카이브"}</span>
-        ${renameBtn}
+        ${renameBtn}${delBtn}
       </div>
       <div class="round-name">${esc(r.round)}</div>
       <div class="round-count">${icon("archive", 13)}<span>아이디어 ${r.count}</span></div>
     </div>`;
   }).join("");
   box.querySelectorAll(".round-card").forEach((el) => {
-    const go = (e) => { if (e.target.closest(".round-edit")) return; selectRound(el.dataset.round); };
+    const go = (e) => { if (e.target.closest(".round-icon-btn")) return; selectRound(el.dataset.round); };
     el.onclick = go;
     el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(e); } };
   });
   box.querySelectorAll(".round-edit").forEach((btn) => {
     btn.onclick = (e) => { e.stopPropagation(); renameRound(btn.dataset.rename); };
+  });
+  box.querySelectorAll(".round-del").forEach((btn) => {
+    btn.onclick = (e) => { e.stopPropagation(); deleteRoundFn(btn.dataset.del); };
   });
   // '새 라운드 시작'은 상단 헤더 버튼으로 이동 — 모달 하단은 관리자에게만 안내
   $("#archive-actions").innerHTML = state.reveal
@@ -1282,6 +1287,19 @@ async function renameRound(oldName) {
   }
   if (isActive) state.activeRound = newName;
   if (state.viewRound === oldName) state.viewRound = newName;
+  await reloadBoard();
+  openArchive();
+}
+async function deleteRoundFn(name) {
+  if (name === state.activeRound) { alert("진행 중인 라운드는 삭제할 수 없어요.\n다른 라운드를 활성화한 뒤 삭제하세요."); return; }
+  const rounds = await loadRounds();
+  const cnt = (rounds.find((r) => r.round === name) || {}).count || 0;
+  if (!confirm(`'${name}' 라운드를 삭제할까요?\n이 라운드의 아이디어 ${cnt}개와 댓글·반응이 모두 영구 삭제됩니다.\n(되돌릴 수 없어요)`)) return;
+  if (DEMO) { demoIdeas = demoIdeas.filter((i) => (i.round || "lab-day") !== name); }
+  else {
+    try { await api.deleteRound(name); } catch (e) { console.error(e); alert("삭제 실패: " + e.message); return; }
+  }
+  if (state.viewRound === name) state.viewRound = state.activeRound;
   await reloadBoard();
   openArchive();
 }
