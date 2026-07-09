@@ -920,20 +920,34 @@ function startEditComment(id) {
   const c = (state.openComments || []).find((x) => x.id === id);
   const node = document.querySelector(`#card-comments .comment[data-id="${id}"]`);
   if (!c || !node) return;
-  node.innerHTML = `<div class="c-edit"><input type="text" class="c-edit-input" maxlength="300" value="${esc(c.body)}" /><button class="c-act" data-save="1">저장</button><button class="c-act" data-cancel="1">취소</button></div>`;
+  // 여러 줄 textarea로 수정 (Enter=줄바꿈, 저장은 버튼/단축키만 → IME 조합 Enter로 저장되는 문제 원천 차단)
+  node.innerHTML = `<div class="c-edit">
+    <textarea class="c-edit-input" maxlength="300" rows="3" autocomplete="off">${esc(c.body)}</textarea>
+    <div class="c-edit-actions">
+      <span class="c-edit-hint">저장: 버튼 또는 Ctrl/⌘+Enter · 취소: Esc</span>
+      <button type="button" class="c-act c-edit-cancel" data-cancel="1">취소</button>
+      <button type="button" class="c-edit-save" data-save="1">저장</button>
+    </div>
+  </div>`;
   const input = node.querySelector(".c-edit-input");
-  input.focus();
+  const closeEdit = () => renderComments(state.openComments);
   const save = async () => {
     const v = input.value.trim();
     if (!v) { input.focus(); return; }
+    if (v === (c.body || "")) { closeEdit(); return; } // 변경 없으면 그냥 닫기
     const ok = await updateComment(id, v);
     if (!ok) return;
     renderComments(await loadComments(state.openId));
   };
   node.querySelector("[data-save]").onclick = save;
-  node.querySelector("[data-cancel]").onclick = () => renderComments(state.openComments);
-  // 한글 조합(IME) 확정용 Enter로 저장이 눌리지 않게 isComposing 가드
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) save(); });
+  node.querySelector("[data-cancel]").onclick = closeEdit;
+  // Enter는 줄바꿈. 저장은 Ctrl/⌘+Enter, 취소는 Esc (조합 중엔 무시)
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); save(); }
+    else if (e.key === "Escape") { e.preventDefault(); closeEdit(); }
+  });
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length); // 커서를 끝으로
 }
 async function removeComment(id) {
   if (!confirm("이 댓글을 삭제할까요?")) return;
@@ -1367,13 +1381,21 @@ $("#comment-form").addEventListener("submit", async (e) => {
   renderSocial(id);
   renderComments(await loadComments(id));
 });
-// 댓글: Enter=등록, Shift+Enter=줄바꿈
-$("#comment-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+// 댓글: Enter=등록, Shift+Enter=줄바꿈 — 크로스브라우징 IME 안전 처리
+// (Windows/Whale 등에서 조합 확정 Enter가 isComposing=false로 오는 경우까지 방어)
+(() => {
+  const inp = $("#comment-input");
+  if (!inp) return;
+  let composing = false, justEnded = false;
+  inp.addEventListener("compositionstart", () => { composing = true; });
+  inp.addEventListener("compositionend", () => { composing = false; justEnded = true; setTimeout(() => { justEnded = false; }, 0); });
+  inp.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.shiftKey) return;                 // Shift+Enter = 줄바꿈
+    if (composing || justEnded || e.isComposing || e.keyCode === 229) return; // 조합 중/직후면 무시
     e.preventDefault();
     $("#comment-form").requestSubmit();
-  }
-});
+  });
+})();
 // 스크림 클릭으로 닫기
 document.querySelectorAll(".modal-scrim").forEach((scrim) => {
   if (scrim.id === "name-modal") return; // 이름은 필수라 닫기 제외
@@ -1413,7 +1435,12 @@ function reconcile(fresh) {
   relayout();
 }
 async function refreshIdeas() { if (!DEMO && !readonly()) reconcile(await loadIdeas()); }
-async function refreshOpenComments() { if (!DEMO && state.openId) renderComments(await loadComments(state.openId)); }
+async function refreshOpenComments() {
+  if (DEMO || !state.openId) return;
+  // 수정/답글 작성 중이면 폴링이 입력 폼을 지우지 않도록 건너뜀
+  if (document.querySelector("#card-comments .c-edit-input, #card-comments .c-replyform")) return;
+  renderComments(await loadComments(state.openId));
+}
 
 function startSync() {
   if (DEMO) return;
