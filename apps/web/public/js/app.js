@@ -557,15 +557,25 @@ async function openSplit() {
   const render = () => {
     box.innerHTML = rounds.map((r) => {
       const on = sel.includes(r.round);
-      return `<button type="button" class="chip split-cat${on ? " on" : ""}" data-round="${esc(r.round)}">${esc(r.round)}<span class="split-cnt">${r.count}</span></button>`;
+      const active = r.round === state.activeRound;
+      return `<div class="round-card selectable${on ? " on" : ""}" data-round="${esc(r.round)}" role="button" tabindex="0" aria-pressed="${on}">
+        <div class="rc-head">
+          <span class="round-badge${active ? " live" : ""}">${active ? "진행 중" : "아카이브"}</span>
+          <span class="sc-check">${icon("check", 13)}</span>
+        </div>
+        <div class="round-name">${esc(r.round)}</div>
+        <div class="round-count">${icon("archive", 13)}<span>아이디어 ${r.count}</span></div>
+      </div>`;
     }).join("");
-    box.querySelectorAll(".split-cat").forEach((el) => {
-      el.onclick = () => {
-        const rn = el.dataset.round;
-        if (sel.includes(rn)) sel = sel.filter((x) => x !== rn);
-        else { if (sel.length >= 4) { alert("최대 4개까지 비교할 수 있어요."); return; } sel.push(rn); }
-        render();
-      };
+    const toggle = (el) => {
+      const rn = el.dataset.round;
+      if (sel.includes(rn)) sel = sel.filter((x) => x !== rn);
+      else { if (sel.length >= 4) { alert("최대 4개까지 비교할 수 있어요."); return; } sel.push(rn); }
+      render();
+    };
+    box.querySelectorAll(".round-card").forEach((el) => {
+      el.onclick = () => toggle(el);
+      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(el); } };
     });
     $("#split-apply").disabled = sel.length < 2;
     $("#split-hint").textContent = `${sel.length}/4 · 2~4개 라운드 선택`;
