@@ -4,7 +4,7 @@
 export const API_BASE = "/api";
 
 // 관리자(전체 열람 권한) 이름 목록 — 정확히 일치할 때만 작성자 공개/관리 기능 노출
-export const REVEAL_NAMES = ["박찬영", "이해원"];
+export const REVEAL_NAMES = ["박찬영", "이해원", "조용선", "김인성"];
 // 팀장 Pick(메달)은 팀장 본인만 가능
 export const TEAM_LEAD_NAME = "박찬영";
 
@@ -17,6 +17,8 @@ export const ACCESS_CODE_HASH = "158a323a7ba44870f23d96f1516dd70aa48e9a72db4ebb0
 export const ADMIN_CODE_HASHES = {
   "박찬영": "1cea97c28cd639e0f3307fdb53660175e9e838ff799211075128e63060eb93eb",
   "이해원": "32625be384ed05129315617a65f0b070e7b35a4257bdd11e0d98185c6f0cecfe",
+  "조용선": "a7502d14f2f3ca2937540068d122a73a1f5d7efcc1913439d28e0d22cf7db301",
+  "김인성": "2cb4c57c545815f3e447294ee771f0f7513c3aae5275bb1dc8c7e436e9a72de3",
 };
 
 // hue = 각 카테고리의 네온 컬러(플래그/링). 네온 스펙트럼에 고르게 분포

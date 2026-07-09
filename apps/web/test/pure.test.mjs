@@ -9,13 +9,18 @@ for (const s of ["", "a", "axdea2026", "pcy2026!", "lhw2026!", "한글코드!@#"
 // config의 공용 입장코드 해시와 일치하는지 (코드 "2026")
 assert.equal(sha256HexSync("2026"), "158a323a7ba44870f23d96f1516dd70aa48e9a72db4ebb026b0a89e212a208ab");
 
-// 관리자(열람) 판정 — 박찬영 · 이해원
+// 관리자(열람) 판정 — 박찬영 · 이해원 · 조용선 · 김인성
 assert.equal(isRevealer("박찬영"), true);
 assert.equal(isRevealer(" 박찬영 "), true);
 assert.equal(isRevealer("이해원"), true);
 assert.equal(isRevealer(" 이해원 "), true);
+assert.equal(isRevealer("조용선"), true);
+assert.equal(isRevealer("김인성"), true);
 assert.equal(isRevealer("박찬영님"), false);
 assert.equal(isRevealer("이해원2"), false);
+// 새 관리자 코드 해시가 config와 일치
+assert.equal(sha256HexSync("0339"), "a7502d14f2f3ca2937540068d122a73a1f5d7efcc1913439d28e0d22cf7db301");
+assert.equal(sha256HexSync("8827"), "2cb4c57c545815f3e447294ee771f0f7513c3aae5275bb1dc8c7e436e9a72de3");
 assert.equal(isRevealer("홍길동"), false);
 assert.equal(isRevealer(""), false);
 
