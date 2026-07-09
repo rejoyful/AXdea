@@ -932,7 +932,8 @@ function startEditComment(id) {
   };
   node.querySelector("[data-save]").onclick = save;
   node.querySelector("[data-cancel]").onclick = () => renderComments(state.openComments);
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
+  // 한글 조합(IME) 확정용 Enter로 저장이 눌리지 않게 isComposing 가드
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing && e.keyCode !== 229) save(); });
 }
 async function removeComment(id) {
   if (!confirm("이 댓글을 삭제할까요?")) return;
