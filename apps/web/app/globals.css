@@ -692,25 +692,66 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .cmt-count svg { display: block; opacity: 0.85; }
 .cmt-count b { font-weight: 800; color: var(--text-2); }
 
-.card-comments { max-height: 42vh; overflow-y: auto; margin-bottom: 12px; }
+/* ===== 댓글 스레드 ===== */
+.card-comments { max-height: 44vh; overflow-y: auto; margin-bottom: 12px; padding-right: 4px; display: flex; flex-direction: column; gap: 4px; }
+
+/* 빈 상태 */
+.comment-empty {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 13.5px; color: var(--text-3);
+  padding: 15px 14px; border: 1px dashed var(--border); border-radius: var(--radius-sm);
+}
+.comment-empty svg { display: block; opacity: 0.75; flex: 0 0 auto; }
+
+/* 댓글 한 건 = [아바타] [본문 컬럼] */
 .comment {
-  display: flex; align-items: flex-start; gap: 8px;
-  font-size: 14px; line-height: 1.6; color: var(--text);
+  display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 6px;
+  transition: border-color 0.14s, background 0.14s;
 }
-.comment .c-main { flex: 1; min-width: 0; word-break: break-word; }
-.comment .c-author { font-weight: 700; color: var(--accent); margin-right: 6px; font-size: 13px; }
-.c-body { color: var(--text); }
-.c-actions { display: flex; gap: 2px; flex: 0 0 auto; }
+.comment:hover { border-color: var(--border-strong); }
+.comment.mine { background: color-mix(in srgb, var(--accent) 7%, var(--surface-2)); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+
+/* 아바타 */
+.c-ava {
+  width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto;
+  display: grid; place-items: center; user-select: none;
+  font-size: 14px; font-weight: 800; letter-spacing: -0.02em;
+}
+.c-ava.sm { width: 26px; height: 26px; font-size: 12px; }
+.c-ava.mine { color: #05121a; background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--neon-lime))); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 2px 9px color-mix(in srgb, var(--accent) 28%, transparent); }
+.c-ava.named { color: #fff; background: hsl(var(--ah, 210) 52% 44%); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16); }
+.c-ava.anon { color: var(--text-3); background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); }
+.c-ava.anon svg { display: block; }
+
+/* 본문 컬럼 */
+.c-col { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.c-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 20px; }
+.c-who { font-size: 13px; font-weight: 800; color: var(--text-2); }
+.c-who.me { color: var(--accent); }
+.c-who.anon { color: var(--text-3); font-weight: 700; }
+.c-when { font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.c-text { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text); word-break: break-word; white-space: pre-wrap; }
+
+/* 액션(수정·삭제·답글): 데스크톱은 hover/focus 시 노출, 터치는 항상 노출 */
+.c-actions { display: flex; gap: 2px; margin: 3px 0 0 -8px; transition: opacity 0.14s; }
+@media (hover: hover) {
+  .c-actions { opacity: 0; }
+  .comment:hover .c-actions, .comment:focus-within .c-actions { opacity: 1; }
+}
 .c-act {
-  display: inline-flex; align-items: center; gap: 3px;
+  display: inline-flex; align-items: center; gap: 4px;
   font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--text-3);
-  background: transparent; border: none; cursor: pointer; padding: 3px 6px; border-radius: 5px;
+  background: transparent; border: none; cursor: pointer; padding: 4px 8px; border-radius: 7px;
+  transition: color 0.12s, background 0.12s;
 }
-.c-act svg { display: block; }
+.c-act svg { display: block; opacity: 0.85; }
 .c-act:hover { color: var(--text); background: var(--surface); }
-/* 댓글 수정: 여러 줄 textarea + 하단 액션 (가독성·반응형) */
+.c-act.danger:hover { color: var(--neon-magenta); background: color-mix(in srgb, var(--neon-magenta) 13%, transparent); }
+
+/* 댓글 수정: 여러 줄 textarea + 하단 액션 (가독성·반응형) — 컬럼 안에서 전체폭 */
+.comment.editing { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
 .c-edit { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .c-edit-input {
   width: 100%; box-sizing: border-box;
@@ -729,37 +770,59 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 }
 .c-edit-save:hover { filter: brightness(1.08); box-shadow: 0 0 12px var(--accent-weak); }
 @media (max-width: 520px) { .c-edit-hint { flex: 1 0 100%; margin-right: 0; order: 3; } }
-.comment-empty { font-size: 14px; color: var(--text-3); padding: 4px 2px 10px; }
 
-/* 긍정/부정 배지 (댓글 앞) */
+/* 감정 배지 (해보자/아쉬워/커피) — 헤더 안에 배치 */
 .c-sent {
   display: inline-flex; align-items: center; gap: 3px;
-  font-size: 11.5px; font-weight: 800; border-radius: 999px;
-  padding: 1px 8px 1px 6px; margin-right: 7px; vertical-align: 1px;
+  font-size: 11px; font-weight: 800; border-radius: 999px;
+  padding: 2px 8px 2px 6px;
 }
 .c-sent svg { display: block; }
 .c-sent.pos { color: #05121a; background: var(--neon-lime); }
 .c-sent.neg { color: #fff; background: var(--neon-magenta); }
 .c-sent.coffee { color: #4a2f00; background: var(--coffee); }
 
-/* 대댓글: 왼쪽 들여쓰기 + 세로선 */
-.c-replies { margin: -2px 0 6px 20px; padding-left: 12px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
-.c-replies .comment { margin-bottom: 0; background: var(--surface); }
+/* 대댓글: 커넥터 레일 + 들여쓰기 */
+.c-replies { margin: 2px 0 2px 16px; padding-left: 16px; border-left: 2px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.c-replies .comment { background: var(--surface); }
+.c-replies .comment.mine { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 
-/* 인라인 답글 작성 폼 */
-.c-replyform { display: flex; flex-wrap: wrap; gap: 7px; margin: -2px 0 8px 32px; }
-.c-replyform .reply-input { flex: 1 1 100%; }
-.c-replyform .sent-pick { flex: 0 0 auto; }
-.c-replyform .c-reply-send { flex: 0 0 auto; }
+/* 인라인 답글 작성 폼 = [내 아바타] [입력+액션바] */
+.c-replyform {
+  display: grid; grid-template-columns: auto 1fr; gap: 10px;
+  margin: 2px 0 4px 16px; padding: 11px 12px 12px 16px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface-2));
+}
+.c-replybody { min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.c-replyform .reply-input {
+  width: 100%; box-sizing: border-box; resize: none; overflow: hidden;
+  font-family: var(--font); font-size: 14px; line-height: 1.55; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: 9px 11px; min-height: 40px;
+}
+.c-replyform .reply-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); outline: none; }
+.c-replybar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.c-replyform .sent-pick { margin: 0; }
+.c-replybtns { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.reply-hint { color: var(--text-3); }
+.c-reply-cancel { padding: 6px 10px; }
+.c-reply-send { padding: 7px 17px; }
+@media (max-width: 520px) {
+  .c-replybtns { margin-left: 0; }
+  .reply-hint { display: none; }
+}
 
 /* 긍정/부정 선택 버튼 */
-.sent-pick { display: flex; gap: 7px; margin-bottom: 10px; }
+.sent-pick { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 10px; }
 .sent-btn {
-  display: inline-flex; align-items: center; gap: 5px;
+  display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; white-space: nowrap;
   font-family: var(--font); font-size: 13px; font-weight: 700; color: var(--text-2);
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 999px; padding: 6px 13px; cursor: pointer; transition: all 0.14s;
 }
+.sent-btn svg { flex: 0 0 auto; }
 .sent-btn svg { display: block; }
 .sent-btn:hover { border-color: var(--border-strong); color: var(--text); }
 .sent-btn.pos.on { color: #05121a; background: var(--neon-lime); border-color: transparent; box-shadow: 0 0 12px color-mix(in srgb, var(--neon-lime) 45%, transparent); }

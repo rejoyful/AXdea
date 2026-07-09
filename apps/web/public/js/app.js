@@ -841,21 +841,45 @@ function sentimentBadge(s) {
   if (s === "coffee") return `<span class="c-sent coffee">${icon("coffee-fill", 13)}커피</span>`;
   return "";
 }
+// 작성자 문자열 → 0~359 hue (관리자 열람 시 작성자별 아바타 색)
+function hueFromStr(s) { let h = 0; s = s || ""; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h; }
+// 아바타: 내 댓글=액센트 '나', 열람 시=작성자색+이니셜, 익명=중립 사람 글리프(서로 구분 불가 → 익명성 유지)
+function commentAvatar(c, mine, isReply) {
+  const sm = isReply ? " sm" : "";
+  if (mine) return `<div class="c-ava mine${sm}" aria-hidden="true">나</div>`;
+  if (state.reveal) {
+    const ch = esc(((c.author || "?").trim().charAt(0)) || "?");
+    return `<div class="c-ava named${sm}" style="--ah:${hueFromStr(c.author || "")}" aria-hidden="true">${ch}</div>`;
+  }
+  return `<div class="c-ava anon${sm}" aria-hidden="true">${icon("user", isReply ? 14 : 16)}</div>`;
+}
 function commentNode(c, isReply) {
   const mine = !!state.me && c.author === state.me;
+  const who = mine ? `<span class="c-who me">나</span>`
+    : state.reveal ? `<span class="c-who">${esc(c.author)}</span>`
+    : `<span class="c-who anon">익명</span>`;
   const ctrls =
-    (mine ? `<button class="c-act" data-act="edit" data-id="${c.id}">수정</button>` : "") +
-    (mine || state.reveal ? `<button class="c-act" data-act="del" data-id="${c.id}">삭제</button>` : "") +
+    (mine ? `<button class="c-act" data-act="edit" data-id="${c.id}">${icon("pencil-simple", 13)}수정</button>` : "") +
+    (mine || state.reveal ? `<button class="c-act danger" data-act="del" data-id="${c.id}">${icon("trash", 13)}삭제</button>` : "") +
     (!isReply ? `<button class="c-act" data-act="reply" data-id="${c.id}">${icon("arrow-bend-down-right", 13)}답글</button>` : "");
-  return `<div class="comment${isReply ? " reply" : ""}" data-id="${c.id}">
-    <div class="c-main">${sentimentBadge(c.sentiment)}${state.reveal ? `<span class="c-author">${esc(c.author)}</span>` : ""}<span class="c-body">${esc(c.body)}</span></div>
-    ${ctrls ? `<div class="c-actions">${ctrls}</div>` : ""}
+  return `<div class="comment${isReply ? " reply" : ""}${mine ? " mine" : ""}" data-id="${c.id}">
+    ${commentAvatar(c, mine, isReply)}
+    <div class="c-col">
+      <div class="c-head">${who}${sentimentBadge(c.sentiment)}<time class="c-when">${timeAgo(c.created_at)}</time></div>
+      <p class="c-text">${esc(c.body)}</p>
+      ${ctrls ? `<div class="c-actions">${ctrls}</div>` : ""}
+    </div>
   </div>`;
 }
 function renderComments(list) {
   const box = $("#card-comments");
+  // 스크롤이 이미 바닥 근처일 때만 새 렌더 후 바닥으로 (읽는 중 스크롤 튐 방지)
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
   state.openComments = list;
-  if (!list.length) { box.innerHTML = ""; return; }
+  if (!list.length) {
+    box.innerHTML = `<div class="comment-empty">${icon("chat-circle", 16)}<span>아직 댓글이 없어요. 첫 반응을 남겨보세요.</span></div>`;
+    return;
+  }
   const tops = list.filter((c) => !c.parent_id);
   const byParent = {};
   list.filter((c) => c.parent_id).forEach((c) => { (byParent[c.parent_id] = byParent[c.parent_id] || []).push(c); });
@@ -871,7 +895,7 @@ function renderComments(list) {
       else if (act === "reply") startReply(cid);
     };
   });
-  box.scrollTop = box.scrollHeight;
+  if (nearBottom) box.scrollTop = box.scrollHeight;
 }
 // 감정 선택기(해보자/아쉬워) — 공용
 function sentButtonsHTML() {
@@ -892,21 +916,56 @@ function wireSentPicker(root, onChange) {
     };
   });
 }
+// 크로스브라우징 IME 안전 Enter 제출 (Windows/Whale 조합확정 Enter까지 방어). Shift+Enter=줄바꿈
+function onEnterSubmit(input, submit) {
+  let composing = false, justEnded = false;
+  input.addEventListener("compositionstart", () => { composing = true; });
+  input.addEventListener("compositionend", () => { composing = false; justEnded = true; setTimeout(() => { justEnded = false; }, 0); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+    if (composing || justEnded || e.isComposing || e.keyCode === 229) return;
+    e.preventDefault();
+    submit();
+  });
+}
+// textarea 높이를 내용에 맞춰 자동 확장 (최대치까지)
+function autoGrow(ta, max = 132) {
+  const fit = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, max) + "px"; };
+  ta.addEventListener("input", fit);
+  requestAnimationFrame(fit);
+}
 function startReply(parentId) {
   if (!state.me) { openNameModal(); return; }
   const node = document.querySelector(`#card-comments .comment[data-id="${parentId}"]`);
-  if (!node || (node.nextElementSibling && node.nextElementSibling.classList.contains("c-replyform"))) return;
+  if (!node) return;
+  // 이미 답글 폼이 열려 있으면 포커스만
+  if (node.nextElementSibling && node.nextElementSibling.classList.contains("c-replyform")) {
+    node.nextElementSibling.querySelector(".reply-input").focus(); return;
+  }
   const form = document.createElement("div");
   form.className = "c-replyform";
-  form.innerHTML = `<input type="text" class="reply-input" maxlength="300" placeholder="답글 남기기…" autocomplete="off" />${sentPickerHTML()}<button class="btn c-reply-send">등록</button>`;
+  form.innerHTML = `
+    <div class="c-ava mine sm" aria-hidden="true">나</div>
+    <div class="c-replybody">
+      <textarea class="reply-input" maxlength="300" rows="1" placeholder="답글 남기기…" autocomplete="off"></textarea>
+      <div class="c-replybar">
+        ${sentPickerHTML()}
+        <div class="c-replybtns">
+          <span class="c-edit-hint reply-hint">Enter 등록 · Shift+Enter 줄바꿈</span>
+          <button type="button" class="c-act c-reply-cancel">취소</button>
+          <button type="button" class="btn primary c-reply-send">등록</button>
+        </div>
+      </div>
+    </div>`;
   node.after(form);
   let sent = null;
   wireSentPicker(form, (s) => { sent = s; });
   const input = form.querySelector(".reply-input");
-  input.focus();
+  autoGrow(input);
+  const close = () => form.remove();
   const send = async () => {
     const v = input.value.trim();
-    if (!v) return;
+    if (!v) { input.focus(); return; }
     await addComment(state.openId, state.me, v, { parent_id: parentId, sentiment: sent });
     state.commentCounts[state.openId] = (state.commentCounts[state.openId] || 0) + 1;
     updateCharCounts(state.openId);
@@ -914,14 +973,19 @@ function startReply(parentId) {
     renderComments(await loadComments(state.openId));
   };
   form.querySelector(".c-reply-send").onclick = send;
-  input.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+  form.querySelector(".c-reply-cancel").onclick = close;
+  onEnterSubmit(input, send);
+  input.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); close(); } });
+  input.focus();
 }
 function startEditComment(id) {
   const c = (state.openComments || []).find((x) => x.id === id);
   const node = document.querySelector(`#card-comments .comment[data-id="${id}"]`);
-  if (!c || !node) return;
+  const col = node && node.querySelector(".c-col");
+  if (!c || !col) return;
+  node.classList.add("editing");
   // 여러 줄 textarea로 수정 (Enter=줄바꿈, 저장은 버튼/단축키만 → IME 조합 Enter로 저장되는 문제 원천 차단)
-  node.innerHTML = `<div class="c-edit">
+  col.innerHTML = `<div class="c-edit">
     <textarea class="c-edit-input" maxlength="300" rows="3" autocomplete="off">${esc(c.body)}</textarea>
     <div class="c-edit-actions">
       <span class="c-edit-hint">저장: 버튼 또는 Ctrl/⌘+Enter · 취소: Esc</span>
@@ -929,7 +993,7 @@ function startEditComment(id) {
       <button type="button" class="c-edit-save" data-save="1">저장</button>
     </div>
   </div>`;
-  const input = node.querySelector(".c-edit-input");
+  const input = col.querySelector(".c-edit-input");
   const closeEdit = () => renderComments(state.openComments);
   const save = async () => {
     const v = input.value.trim();
@@ -939,8 +1003,8 @@ function startEditComment(id) {
     if (!ok) return;
     renderComments(await loadComments(state.openId));
   };
-  node.querySelector("[data-save]").onclick = save;
-  node.querySelector("[data-cancel]").onclick = closeEdit;
+  col.querySelector("[data-save]").onclick = save;
+  col.querySelector("[data-cancel]").onclick = closeEdit;
   // Enter는 줄바꿈. 저장은 Ctrl/⌘+Enter, 취소는 Esc (조합 중엔 무시)
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); save(); }
@@ -1381,20 +1445,10 @@ $("#comment-form").addEventListener("submit", async (e) => {
   renderSocial(id);
   renderComments(await loadComments(id));
 });
-// 댓글: Enter=등록, Shift+Enter=줄바꿈 — 크로스브라우징 IME 안전 처리
-// (Windows/Whale 등에서 조합 확정 Enter가 isComposing=false로 오는 경우까지 방어)
+// 댓글: Enter=등록, Shift+Enter=줄바꿈 — 크로스브라우징 IME 안전 처리(공용 헬퍼)
 (() => {
   const inp = $("#comment-input");
-  if (!inp) return;
-  let composing = false, justEnded = false;
-  inp.addEventListener("compositionstart", () => { composing = true; });
-  inp.addEventListener("compositionend", () => { composing = false; justEnded = true; setTimeout(() => { justEnded = false; }, 0); });
-  inp.addEventListener("keydown", (e) => {
-    if (e.key !== "Enter" || e.shiftKey) return;                 // Shift+Enter = 줄바꿈
-    if (composing || justEnded || e.isComposing || e.keyCode === 229) return; // 조합 중/직후면 무시
-    e.preventDefault();
-    $("#comment-form").requestSubmit();
-  });
+  if (inp) onEnterSubmit(inp, () => $("#comment-form").requestSubmit());
 })();
 // 스크림 클릭으로 닫기
 document.querySelectorAll(".modal-scrim").forEach((scrim) => {
