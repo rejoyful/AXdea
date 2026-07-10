@@ -693,7 +693,7 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 .cmt-count b { font-weight: 800; color: var(--text-2); }
 
 /* ===== 댓글 스레드 ===== */
-.card-comments { max-height: 44vh; overflow-y: auto; margin-bottom: 12px; padding-right: 4px; display: flex; flex-direction: column; gap: 4px; }
+.card-comments { display: flex; flex-direction: column; gap: 4px; }
 
 /* 빈 상태 */
 .comment-empty {
@@ -968,7 +968,19 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 @media (max-width: 520px) { .marquee { top: 60px; } .mq-track span { font-size: 19px; letter-spacing: 3px; } }
 .archive-card { max-width: min(1040px, 92vw); }
 .split-card { max-width: min(920px, 92vw); }
-.idea-card { max-width: 640px; }
+/* 아이디어 카드 = 3구역 세로 레이아웃: 고정 헤더 · 단일 스크롤 · 고정 도크
+   (모달 자체 스크롤을 없애고 스레드만 스크롤 → 이중 스크롤·버튼 잘림 해결) */
+.idea-card {
+  max-width: 600px;
+  display: flex; flex-direction: column;
+  max-height: min(880px, calc(100dvh - 40px));
+  padding: 0; overflow: hidden;
+}
+.idea-card .card-head { flex: 0 0 auto; margin: 0; padding: 24px 30px 14px; }
+.card-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 30px 8px; overscroll-behavior: contain; }
+.card-dock { flex: 0 0 auto; border-top: 1px solid var(--border); background: var(--surface); padding: 14px 30px 20px; }
+.card-dock .comment-form { margin: 0; }
+.card-dock .card-footer { border-top: none; padding-top: 0; margin-top: 12px; flex-wrap: wrap; }
 /* 아카이브/분할: 라운드 카드 그리드 */
 #archive-items { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); grid-auto-rows: auto; }
 #split-cats { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px; }
@@ -1015,6 +1027,11 @@ input::placeholder, textarea::placeholder { color: var(--text-3); }
 @media (max-width: 520px) {
   .tagline { display: none; }
   .modal { padding: 20px; border-radius: 16px; }
+  /* 아이디어 카드는 3구역 레이아웃 유지(패딩은 각 구역이 담당) */
+  .idea-card { padding: 0; border-radius: 16px; max-height: calc(100dvh - 20px); }
+  .idea-card .card-head { padding: 20px 18px 12px; }
+  .card-scroll { padding: 2px 18px 6px; }
+  .card-dock { padding: 12px 18px 16px; }
   .char { width: 68px; height: 68px; margin: -34px 0 0 -34px; }
   .topbar { gap: 6px; padding: 0 8px; }
   .navbtn { height: 32px; padding: 0 8px; }

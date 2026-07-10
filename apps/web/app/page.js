@@ -52,17 +52,21 @@ const MARKUP = `
   <div class="modal-scrim" id="card-modal" hidden>
     <div class="modal idea-card" id="idea-card">
       <div class="card-head" id="card-head"></div>
-      <div class="card-body" id="card-body"></div>
-      <div class="card-social" id="card-social"></div>
-      <div class="card-comments" id="card-comments"></div>
-      <form class="comment-form" id="comment-form">
-        <div class="sent-pick" id="comment-sent"></div>
-        <div class="comment-row">
-          <textarea id="comment-input" placeholder="첫 댓글을 남겨보세요" maxlength="300" rows="2" autocomplete="off"></textarea>
-          <button class="btn primary" type="submit">등록</button>
-        </div>
-      </form>
-      <div class="card-footer" id="card-footer"></div>
+      <div class="card-scroll" id="card-scroll">
+        <div class="card-body" id="card-body"></div>
+        <div class="card-social" id="card-social"></div>
+        <div class="card-comments" id="card-comments"></div>
+      </div>
+      <div class="card-dock">
+        <form class="comment-form" id="comment-form">
+          <div class="sent-pick" id="comment-sent"></div>
+          <div class="comment-row">
+            <textarea id="comment-input" placeholder="첫 댓글을 남겨보세요" maxlength="300" rows="2" autocomplete="off"></textarea>
+            <button class="btn primary" type="submit">등록</button>
+          </div>
+        </form>
+        <div class="card-footer" id="card-footer"></div>
+      </div>
       <button class="modal-close" id="card-close" aria-label="닫기">✕</button>
     </div>
   </div>

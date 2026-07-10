@@ -833,7 +833,9 @@ async function openCard(id) {
   if (csp) { csp.innerHTML = sentButtonsHTML(); state.cSent = null; wireSentPicker(csp, (s) => { state.cSent = s; }); }
   renderSocial(id);
   $("#card-modal").hidden = false;
+  const sc = $("#card-scroll"); if (sc) sc.scrollTop = 0; // 열 때는 항상 아이디어 본문부터
   renderComments(await loadComments(id));
+  if (sc) sc.scrollTop = 0; // 렌더 후에도 최상단 고정(자동 하단이동은 새 댓글 작성 시에만)
 }
 function sentimentBadge(s) {
   if (s === "pos") return `<span class="c-sent pos">${icon("thumbs-up-fill", 13)}해보자</span>`;
@@ -873,8 +875,9 @@ function commentNode(c, isReply) {
 }
 function renderComments(list) {
   const box = $("#card-comments");
+  const scroller = $("#card-scroll") || box; // 단일 스크롤 구역
   // 스크롤이 이미 바닥 근처일 때만 새 렌더 후 바닥으로 (읽는 중 스크롤 튐 방지)
-  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 60;
+  const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
   state.openComments = list;
   if (!list.length) {
     box.innerHTML = `<div class="comment-empty">${icon("chat-circle", 16)}<span>아직 댓글이 없어요. 첫 반응을 남겨보세요.</span></div>`;
@@ -895,7 +898,7 @@ function renderComments(list) {
       else if (act === "reply") startReply(cid);
     };
   });
-  if (nearBottom) box.scrollTop = box.scrollHeight;
+  if (nearBottom) scroller.scrollTop = scroller.scrollHeight;
 }
 // 감정 선택기(해보자/아쉬워) — 공용
 function sentButtonsHTML() {
@@ -1444,6 +1447,7 @@ $("#comment-form").addEventListener("submit", async (e) => {
   updateCharCounts(id);
   renderSocial(id);
   renderComments(await loadComments(id));
+  const sc = $("#card-scroll"); if (sc) sc.scrollTop = sc.scrollHeight; // 내가 쓴 새 댓글로 스크롤
 });
 // 댓글: Enter=등록, Shift+Enter=줄바꿈 — 크로스브라우징 IME 안전 처리(공용 헬퍼)
 (() => {
